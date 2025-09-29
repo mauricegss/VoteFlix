@@ -21,7 +21,6 @@ public class LoginController {
     @FXML private Button loginButton;
     @FXML private Label statusLabel;
 
-    // ... (os outros métodos handleLoginButtonAction, handleRegisterButtonAction, handleLoginResponse estão corretos) ...
     @FXML
     protected void handleLoginButtonAction() {
         String username = usernameField.getText();
@@ -69,7 +68,7 @@ public class LoginController {
                 }
             } catch (JSONException e) {
                 showAlert(Alert.AlertType.ERROR, "Erro de Protocolo", "O servidor enviou uma resposta em um formato inesperado: " + responseJson);
-                e.printStackTrace();
+                System.err.println("Erro de JSONException: " + e.getMessage());
             }
         });
     }
@@ -107,7 +106,6 @@ public class LoginController {
             Stage currentStage = (Stage) loginButton.getScene().getWindow();
             currentStage.close();
 
-            // Forma correta de obter o recurso e passar para o FXMLLoader
             URL fxmlLocation = getClass().getResource("/view/ProfileView.fxml");
             FXMLLoader loader = new FXMLLoader(fxmlLocation);
 
@@ -121,7 +119,7 @@ public class LoginController {
             stage.setScene(new Scene(loader.load()));
             stage.show();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Erro ao carregar FXML da tela de perfil: " + e.getMessage());
             showAlert(Alert.AlertType.ERROR, "Erro ao Carregar Tela", "Ocorreu um erro ao tentar carregar a tela de perfil.");
         }
     }

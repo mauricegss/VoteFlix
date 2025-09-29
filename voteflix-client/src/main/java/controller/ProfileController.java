@@ -18,6 +18,13 @@ public class ProfileController {
     @FXML private Label welcomeLabel;
     @FXML private Label statusLabel;
 
+    // This new method runs when the window opens, resolving the 'welcomeLabel' warning.
+    @FXML
+    private void initialize() {
+        // TODO: To make this dynamic, get the username from the session token.
+        welcomeLabel.setText("Bem-vindo(a) ao seu Perfil!");
+    }
+
     @FXML
     private void handleUpdatePassword() {
         TextInputDialog dialog = new TextInputDialog();
@@ -73,13 +80,8 @@ public class ProfileController {
         Optional<ButtonType> result = confirmation.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
             statusLabel.setText("Apagando conta...");
-            Task<String> deleteTask = new Task<>() {
-                @Override
-                protected String call() {
-                    String token = SessionManager.getInstance().getToken();
-                    return ServerConnection.getInstance().deleteOwnUser(token);
-                }
-            };
+            // The logic for creating the task has been moved to its own method.
+            Task<String> deleteTask = createDeleteTask();
             deleteTask.setOnSucceeded(e -> {
                 handleGenericResponse(deleteTask.getValue(), "Conta apagada com sucesso.");
                 SessionManager.getInstance().clearSession();
@@ -87,6 +89,17 @@ public class ProfileController {
             });
             new Thread(deleteTask).start();
         }
+    }
+
+    // This new private method resolves the "extract method" warning.
+    private Task<String> createDeleteTask() {
+        return new Task<>() {
+            @Override
+            protected String call() {
+                String token = SessionManager.getInstance().getToken();
+                return ServerConnection.getInstance().deleteOwnUser(token);
+            }
+        };
     }
 
     private void handleGenericResponse(String responseJson, String successMessage) {

@@ -50,7 +50,7 @@ public class ConnectionController {
                         try {
                             openLoginWindow();
                         } catch (IOException e) {
-                            showAlert("Erro", "Não foi possível abrir a tela de login.");
+                            showLoginWindowErrorAlert();
                             setUIState(false);
                         }
                     } else {
@@ -84,11 +84,11 @@ public class ConnectionController {
         stage.show();
     }
 
-    private void showAlert(String title, String message) {
+    private void showLoginWindowErrorAlert() {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
+        alert.setTitle("Erro");
         alert.setHeaderText(null);
-        alert.setContentText(message);
+        alert.setContentText("Não foi possível abrir a tela de login.");
         alert.showAndWait();
     }
 }

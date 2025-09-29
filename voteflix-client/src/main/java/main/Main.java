@@ -8,11 +8,10 @@ import network.ServerConnection;
 import java.io.IOException;
 import java.net.URL;
 
-public class MainApplication extends Application {
+public class Main extends Application {
     @Override
     public void start(Stage stage) throws IOException {
-        // Forma correta de obter o recurso e passar para o FXMLLoader
-        URL fxmlLocation = MainApplication.class.getResource("/view/ConnectionView.fxml");
+        URL fxmlLocation = Main.class.getResource("/view/ConnectionView.fxml");
         FXMLLoader fxmlLoader = new FXMLLoader(fxmlLocation);
 
         Scene scene = new Scene(fxmlLoader.load(), 300, 250);
@@ -27,6 +26,7 @@ public class MainApplication extends Application {
         ServerConnection.getInstance().disconnect();
     }
 
+    @SuppressWarnings("unused")
     public static void main(String[] args) {
         launch();
     }
