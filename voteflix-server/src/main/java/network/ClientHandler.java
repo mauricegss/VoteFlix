@@ -6,7 +6,6 @@ import model.User;
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.JwtUtil;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -23,6 +22,7 @@ public class ClientHandler implements Runnable {
     private PrintWriter out;
     private BufferedReader in;
     private String username;
+    private boolean needsToClose = false;
 
     public ClientHandler(Socket socket, ServerController controller, Server server) {
         this.clientSocket = socket;
@@ -44,6 +44,9 @@ public class ClientHandler implements Runnable {
                 String response = processRequest(inputLine);
                 out.println(response);
                 controller.log("-> Para " + clientAddr + ": " + response, ServerController.LogType.REQUEST);
+                if (needsToClose) {
+                    break;
+                }
             }
         } catch (SocketException e) {
             controller.log("Conexão com " + getIdentifier() + " foi perdida.", ServerController.LogType.DISCONNECTION);
@@ -65,6 +68,7 @@ public class ClientHandler implements Runnable {
                 case "LOGOUT" -> handleLogout(request);
                 case "EDITAR_PROPRIO_USUARIO" -> handleUpdatePassword(request);
                 case "EXCLUIR_PROPRIO_USUARIO" -> handleDeleteUser(request);
+                case "LISTAR_PROPRIO_USUARIO" -> handleListOwnUser(request);
                 default -> {
                     controller.log("Recebida operação desconhecida: '" + operacao + "' de " + getIdentifier(), ServerController.LogType.ERROR);
                     yield createErrorResponse(400, "Operação desconhecida.");
@@ -85,7 +89,9 @@ public class ClientHandler implements Runnable {
             User foundUser = userDAO.findByUsername(user);
             if (foundUser != null && foundUser.getSenha().equals(pass)) {
                 this.username = user;
-                server.addAuthenticatedUser(this.username);
+                String userWithIp = String.format("%s (%s)", user, clientSocket.getInetAddress().getHostAddress());
+                server.addAuthenticatedUser(userWithIp);
+
                 String token = JwtUtil.generateToken(user);
                 JSONObject response = new JSONObject();
                 response.put("status", "200");
@@ -105,9 +111,16 @@ public class ClientHandler implements Runnable {
 
     private String handleCreateUser(JSONObject request) {
         JSONObject userJson = request.getJSONObject("usuario");
+        String username = userJson.getString("nome");
+        String password = userJson.getString("senha");
+
+        if (username.length() < 3 || username.length() > 20 || password.length() < 3 || password.length() > 20) {
+            return createErrorResponse(400, "Usuário e senha devem ter entre 3 e 20 caracteres.");
+        }
+
         User newUser = new User();
-        newUser.setNome(userJson.getString("nome"));
-        newUser.setSenha(userJson.getString("senha"));
+        newUser.setNome(username);
+        newUser.setSenha(password);
 
         controller.log("Tentativa de criar usuário '" + newUser.getNome() + "'.", ServerController.LogType.INFO);
         if (userDAO.createUser(newUser)) {
@@ -126,9 +139,9 @@ public class ClientHandler implements Runnable {
         String token = request.getString("token");
         String userFromToken = JwtUtil.getUsernameFromToken(token);
         if (userFromToken != null) {
-            server.removeClient(this);
             controller.log("Usuário '" + userFromToken + "' fez logout.", ServerController.LogType.DISCONNECTION);
         }
+        this.needsToClose = true;
         JSONObject response = new JSONObject();
         response.put("status", "200");
         response.put("mensagem", "Logout realizado com sucesso.");
@@ -170,7 +183,7 @@ public class ClientHandler implements Runnable {
         controller.log("Usuário '" + userFromToken + "' solicitou a exclusão da própria conta.", ServerController.LogType.INFO);
         try {
             if (userDAO.deleteUser(userFromToken)) {
-                server.removeClient(this);
+                this.needsToClose = true;
                 controller.log("Usuário '" + userFromToken + "' foi excluído.", ServerController.LogType.DISCONNECTION);
                 return createSuccessResponse("Usuário excluído com sucesso.");
             } else {
@@ -181,6 +194,20 @@ public class ClientHandler implements Runnable {
             controller.log("Erro de banco de dados ao excluir usuário '" + userFromToken + "': " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500, "Erro interno no servidor.");
         }
+    }
+
+    private String handleListOwnUser(JSONObject request) {
+        String token = request.getString("token");
+        String userFromToken = JwtUtil.getUsernameFromToken(token);
+
+        if (userFromToken == null) {
+            return createErrorResponse(401, "Token inválido ou expirado.");
+        }
+
+        JSONObject response = new JSONObject();
+        response.put("status", "200");
+        response.put("usuario", userFromToken);
+        return response.toString();
     }
 
     private String createErrorResponse(int status, String message) {
@@ -210,7 +237,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private String getIdentifier() {
+    public String getIdentifier() {
         return username != null ? username : clientSocket.getInetAddress().toString();
     }
 

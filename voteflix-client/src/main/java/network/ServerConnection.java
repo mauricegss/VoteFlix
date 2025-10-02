@@ -67,7 +67,6 @@ public class ServerConnection {
             out.println(jsonRequest);
             String response = in.readLine();
             if (response == null) {
-                // Se a resposta for nula, o servidor provavelmente fechou a conexão
                 disconnect();
                 return createErrorResponse("A conexao com o servidor foi perdida.");
             }
@@ -100,7 +99,6 @@ public class ServerConnection {
         JSONObject request = new JSONObject();
         request.put("operacao", "LOGOUT");
         request.put("token", token);
-        // Após o logout, o servidor pode fechar a conexão, então nós também desconectamos.
         String response = sendRequestAndGetResponse(request.toString());
         disconnect();
         return response;
@@ -125,9 +123,15 @@ public class ServerConnection {
         return response;
     }
 
+    public String listOwnUser(String token) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "LISTAR_PROPRIO_USUARIO");
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
     private String createErrorResponse(String message) {
         JSONObject errorResponse = new JSONObject();
-        // Usando um status de erro interno para diferenciar de erros do servidor
         errorResponse.put("status", "999");
         errorResponse.put("mensagem", message);
         return errorResponse.toString();

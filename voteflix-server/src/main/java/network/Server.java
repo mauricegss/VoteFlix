@@ -64,12 +64,16 @@ public class Server implements Runnable {
             controller.log("Erro ao parar o servidor: " + e.getMessage(), ServerController.LogType.ERROR);
         }
     }
+
     public void removeClient(ClientHandler clientHandler) {
         activeClients.remove(clientHandler);
-        controller.updateActiveUsers(clientHandler.getUsername(), false);
+        if (clientHandler.getUsername() != null && !clientHandler.getUsername().isEmpty()) {
+            String userWithIp = String.format("%s (%s)", clientHandler.getUsername(), clientHandler.getIdentifier());
+            controller.updateActiveUsers(userWithIp, false);
+        }
     }
 
-    public void addAuthenticatedUser(String username) {
-        controller.updateActiveUsers(username, true);
+    public void addAuthenticatedUser(String userWithIp) {
+        controller.updateActiveUsers(userWithIp, true);
     }
 }

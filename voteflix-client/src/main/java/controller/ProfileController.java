@@ -18,10 +18,8 @@ public class ProfileController {
     @FXML private Label welcomeLabel;
     @FXML private Label statusLabel;
 
-    // This new method runs when the window opens, resolving the 'welcomeLabel' warning.
     @FXML
     private void initialize() {
-        // TODO: To make this dynamic, get the username from the session token.
         welcomeLabel.setText("Bem-vindo(a) ao seu Perfil!");
     }
 
@@ -53,6 +51,40 @@ public class ProfileController {
     }
 
     @FXML
+    private void handleListOwnUser() {
+        statusLabel.setText("Buscando informações...");
+        Task<String> listUserTask = new Task<>() {
+            @Override
+            protected String call() {
+                String token = SessionManager.getInstance().getToken();
+                // O método de conexão já está correto, chamando "LISTAR_PROPRIO_USUARIO"
+                return ServerConnection.getInstance().listOwnUser(token);
+            }
+        };
+
+        listUserTask.setOnSucceeded(e -> {
+            statusLabel.setText("");
+            String responseJson = listUserTask.getValue();
+            if (responseJson == null) {
+                showAlert(Alert.AlertType.ERROR, "Erro", "Erro de comunicação com o servidor.");
+                return;
+            }
+
+            JSONObject response = new JSONObject(responseJson);
+            if ("200".equals(response.getString("status"))) {
+                // **ESTA É A LINHA CORRIGIDA**
+                // Estamos lendo a String diretamente da chave "usuario", conforme o erro indicou.
+                String username = response.getString("usuario");
+                showAlert(Alert.AlertType.INFORMATION, "Informações do Usuário", "Seu nome de usuário é: " + username);
+            } else {
+                showAlert(Alert.AlertType.ERROR, "Erro", response.optString("mensagem", "Não foi possível obter as informações."));
+            }
+        });
+
+        new Thread(listUserTask).start();
+    }
+
+    @FXML
     private void handleLogout() {
         statusLabel.setText("Saindo...");
         Task<String> logoutTask = new Task<>() {
@@ -80,7 +112,6 @@ public class ProfileController {
         Optional<ButtonType> result = confirmation.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
             statusLabel.setText("Apagando conta...");
-            // The logic for creating the task has been moved to its own method.
             Task<String> deleteTask = createDeleteTask();
             deleteTask.setOnSucceeded(e -> {
                 handleGenericResponse(deleteTask.getValue(), "Conta apagada com sucesso.");
@@ -91,7 +122,6 @@ public class ProfileController {
         }
     }
 
-    // This new private method resolves the "extract method" warning.
     private Task<String> createDeleteTask() {
         return new Task<>() {
             @Override
