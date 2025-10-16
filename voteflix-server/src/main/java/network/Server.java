@@ -68,7 +68,7 @@ public class Server implements Runnable {
     public void removeClient(ClientHandler clientHandler) {
         activeClients.remove(clientHandler);
         if (clientHandler.getUsername() != null && !clientHandler.getUsername().isEmpty()) {
-            String userWithIp = String.format("%s (%s)", clientHandler.getUsername(), clientHandler.getIdentifier());
+            String userWithIp = String.format("%s (%s)", clientHandler.getUsername(), clientHandler.getClientIpAddress());
             controller.updateActiveUsers(userWithIp, false);
         }
     }

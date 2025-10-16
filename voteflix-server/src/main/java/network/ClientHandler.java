@@ -114,8 +114,9 @@ public class ClientHandler implements Runnable {
         String username = userJson.getString("nome");
         String password = userJson.getString("senha");
 
+        // --- CORREÇÃO 1: Uso do status 422 para erro de validação ---
         if (username.length() < 3 || username.length() > 20 || password.length() < 3 || password.length() > 20) {
-            return createErrorResponse(400, "Usuário e senha devem ter entre 3 e 20 caracteres.");
+            return createErrorResponse(422, "Usuário e senha devem ter entre 3 e 20 caracteres.");
         }
 
         User newUser = new User();
@@ -158,6 +159,12 @@ public class ClientHandler implements Runnable {
 
         controller.log("Usuário '" + userFromToken + "' solicitou alteração de senha.", ServerController.LogType.INFO);
         String newPassword = request.getJSONObject("usuario").getString("senha");
+
+        // --- CORREÇÃO 2: Adicionada validação de tamanho para a nova senha ---
+        if (newPassword.length() < 3 || newPassword.length() > 20) {
+            return createErrorResponse(422, "A nova senha deve ter entre 3 e 20 caracteres.");
+        }
+
         try {
             if (userDAO.updatePassword(userFromToken, newPassword)) {
                 controller.log("Senha do usuário '" + userFromToken + "' alterada com sucesso.", ServerController.LogType.INFO);
@@ -243,5 +250,9 @@ public class ClientHandler implements Runnable {
 
     public String getUsername() {
         return username;
+    }
+
+    public String getClientIpAddress() {
+        return clientSocket.getInetAddress().getHostAddress();
     }
 }

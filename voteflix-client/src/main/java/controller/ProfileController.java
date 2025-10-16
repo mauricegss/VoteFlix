@@ -11,6 +11,8 @@ import javafx.stage.Stage;
 import network.ServerConnection;
 import org.json.JSONObject;
 import session.SessionManager;
+import util.StatusCodeHandler; // <-- IMPORTAÇÃO ADICIONADA
+
 import java.util.Optional;
 
 public class ProfileController {
@@ -57,7 +59,6 @@ public class ProfileController {
             @Override
             protected String call() {
                 String token = SessionManager.getInstance().getToken();
-                // O método de conexão já está correto, chamando "LISTAR_PROPRIO_USUARIO"
                 return ServerConnection.getInstance().listOwnUser(token);
             }
         };
@@ -71,13 +72,14 @@ public class ProfileController {
             }
 
             JSONObject response = new JSONObject(responseJson);
-            if ("200".equals(response.getString("status"))) {
-                // **ESTA É A LINHA CORRIGIDA**
-                // Estamos lendo a String diretamente da chave "usuario", conforme o erro indicou.
+            String status = response.getString("status");
+            if ("200".equals(status)) {
                 String username = response.getString("usuario");
                 showAlert(Alert.AlertType.INFORMATION, "Informações do Usuário", "Seu nome de usuário é: " + username);
             } else {
-                showAlert(Alert.AlertType.ERROR, "Erro", response.optString("mensagem", "Não foi possível obter as informações."));
+                String serverMessage = response.optString("mensagem");
+                String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
             }
         });
 
@@ -144,7 +146,10 @@ public class ProfileController {
             if ("200".equals(status)) {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", successMessage);
             } else {
-                showAlert(Alert.AlertType.ERROR, "Erro", "Ocorreu um erro: " + response.optString("mensagem"));
+                // --- LÓGICA DE ERRO ATUALIZADA ---
+                String serverMessage = response.optString("mensagem");
+                String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                showAlert(Alert.AlertType.ERROR, "Erro", "Ocorreu um erro: " + finalMessage);
             }
         });
     }

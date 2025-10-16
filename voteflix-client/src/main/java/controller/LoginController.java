@@ -11,6 +11,7 @@ import network.ServerConnection;
 import org.json.JSONException;
 import org.json.JSONObject;
 import session.SessionManager;
+import util.StatusCodeHandler;
 import java.io.IOException;
 import java.net.URL;
 
@@ -26,10 +27,7 @@ public class LoginController {
         String username = usernameField.getText();
         String password = passwordField.getText();
 
-        if (username.isEmpty() || password.isEmpty()) {
-            statusLabel.setText("Usuário e senha não podem ser vazios.");
-            return;
-        }
+        // --- CORREÇÃO: Verificação de campos vazios foi REMOVIDA ---
 
         statusLabel.setText("Autenticando...");
         loginButton.setDisable(true);
@@ -64,7 +62,9 @@ public class LoginController {
                     SessionManager.getInstance().setToken(token);
                     openProfileWindow();
                 } else {
-                    statusLabel.setText(response.optString("mensagem", "Usuário ou senha inválidos."));
+                    String serverMessage = response.optString("mensagem");
+                    String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                    statusLabel.setText(finalMessage);
                 }
             } catch (JSONException e) {
                 showAlert(Alert.AlertType.ERROR, "Erro de Protocolo", "O servidor enviou uma resposta em um formato inesperado: " + responseJson);
@@ -77,10 +77,8 @@ public class LoginController {
     protected void handleRegisterButtonAction() {
         String username = usernameField.getText();
         String password = passwordField.getText();
-        if (username.isEmpty() || password.isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Atenção", "Preencha os campos de usuário e senha antes de cadastrar.");
-            return;
-        }
+
+        // --- CORREÇÃO: Verificação de campos vazios foi REMOVIDA ---
 
         statusLabel.setText("Cadastrando...");
         Task<String> registerTask = new Task<>() {
@@ -91,10 +89,13 @@ public class LoginController {
         };
         registerTask.setOnSucceeded(e -> Platform.runLater(() -> {
             JSONObject response = new JSONObject(registerTask.getValue());
-            if ("201".equals(response.getString("status"))) {
+            String status = response.getString("status");
+            if ("201".equals(status)) {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário '" + username + "' cadastrado! Agora você pode fazer o login.");
             } else {
-                showAlert(Alert.AlertType.ERROR, "Erro", "Não foi possível cadastrar: " + response.optString("mensagem"));
+                String serverMessage = response.optString("mensagem");
+                String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                showAlert(Alert.AlertType.ERROR, "Erro", "Não foi possível cadastrar: " + finalMessage);
             }
             statusLabel.setText("");
         }));

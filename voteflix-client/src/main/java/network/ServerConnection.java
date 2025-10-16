@@ -7,6 +7,8 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class ServerConnection {
 
@@ -14,6 +16,7 @@ public class ServerConnection {
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+    private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private ServerConnection() {}
 
@@ -64,16 +67,22 @@ public class ServerConnection {
             return createErrorResponse("Nao conectado ao servidor.");
         }
         try {
+            log("-> Para Servidor: " + jsonRequest);
             out.println(jsonRequest);
             String response = in.readLine();
             if (response == null) {
                 disconnect();
-                return createErrorResponse("A conexao com o servidor foi perdida.");
+                String errorResponse = createErrorResponse("A conexao com o servidor foi perdida.");
+                log("<- De Servidor: " + errorResponse);
+                return errorResponse;
             }
+            log("<- De Servidor: " + response);
             return response;
         } catch (IOException e) {
             disconnect();
-            return createErrorResponse("A conexao com o servidor foi perdida.");
+            String errorResponse = createErrorResponse("A conexao com o servidor foi perdida.");
+            log("<- De Servidor: " + errorResponse);
+            return errorResponse;
         }
     }
 
@@ -135,5 +144,10 @@ public class ServerConnection {
         errorResponse.put("status", "999");
         errorResponse.put("mensagem", message);
         return errorResponse.toString();
+    }
+
+    private void log(String message) {
+        String timestamp = dtf.format(LocalDateTime.now());
+        System.out.println("[" + timestamp + "] " + message);
     }
 }
