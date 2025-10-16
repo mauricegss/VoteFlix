@@ -101,7 +101,7 @@ public class ClientHandler implements Runnable {
                 return response.toString();
             } else {
                 controller.log("Falha na autenticação para o usuário '" + user + "'.", ServerController.LogType.ERROR);
-                return createErrorResponse(401, "Usuário ou senha inválidos.");
+                return createErrorResponse(401, "");
             }
         } catch (SQLException e) {
             controller.log("Erro de banco de dados ao buscar usuário '" + user + "': " + e.getMessage(), ServerController.LogType.ERROR);
@@ -114,9 +114,8 @@ public class ClientHandler implements Runnable {
         String username = userJson.getString("nome");
         String password = userJson.getString("senha");
 
-        // --- CORREÇÃO 1: Uso do status 422 para erro de validação ---
         if (username.length() < 3 || username.length() > 20 || password.length() < 3 || password.length() > 20) {
-            return createErrorResponse(422, "Usuário e senha devem ter entre 3 e 20 caracteres.");
+            return createErrorResponse(422, "");
         }
 
         User newUser = new User();
@@ -132,7 +131,7 @@ public class ClientHandler implements Runnable {
             return response.toString();
         } else {
             controller.log("Falha ao criar usuário '" + newUser.getNome() + "'. Usuário já existe.", ServerController.LogType.ERROR);
-            return createErrorResponse(409, "Usuário já existe.");
+            return createErrorResponse(409, "");
         }
     }
 
@@ -154,15 +153,14 @@ public class ClientHandler implements Runnable {
         String userFromToken = JwtUtil.getUsernameFromToken(token);
         if (userFromToken == null) {
             controller.log("Tentativa de alteração de senha com token inválido por " + getIdentifier(), ServerController.LogType.ERROR);
-            return createErrorResponse(401, "Token inválido ou expirado.");
+            return createErrorResponse(401, "");
         }
 
         controller.log("Usuário '" + userFromToken + "' solicitou alteração de senha.", ServerController.LogType.INFO);
         String newPassword = request.getJSONObject("usuario").getString("senha");
 
-        // --- CORREÇÃO 2: Adicionada validação de tamanho para a nova senha ---
         if (newPassword.length() < 3 || newPassword.length() > 20) {
-            return createErrorResponse(422, "A nova senha deve ter entre 3 e 20 caracteres.");
+            return createErrorResponse(422, "");
         }
 
         try {
@@ -171,7 +169,7 @@ public class ClientHandler implements Runnable {
                 return createSuccessResponse("Senha alterada com sucesso.");
             } else {
                 controller.log("Falha ao alterar a senha do usuário '" + userFromToken + "'. Usuário não encontrado.", ServerController.LogType.ERROR);
-                return createErrorResponse(404, "Usuário não encontrado.");
+                return createErrorResponse(404, "");
             }
         } catch (SQLException e) {
             controller.log("Erro de banco de dados ao atualizar senha para '" + userFromToken + "': " + e.getMessage(), ServerController.LogType.ERROR);
@@ -184,7 +182,7 @@ public class ClientHandler implements Runnable {
         String userFromToken = JwtUtil.getUsernameFromToken(token);
         if (userFromToken == null) {
             controller.log("Tentativa de exclusão de conta com token inválido por " + getIdentifier(), ServerController.LogType.ERROR);
-            return createErrorResponse(401, "Token inválido ou expirado.");
+            return createErrorResponse(401, "");
         }
 
         controller.log("Usuário '" + userFromToken + "' solicitou a exclusão da própria conta.", ServerController.LogType.INFO);
@@ -195,7 +193,7 @@ public class ClientHandler implements Runnable {
                 return createSuccessResponse("Usuário excluído com sucesso.");
             } else {
                 controller.log("Falha ao excluir o usuário '" + userFromToken + "'. Usuário não encontrado.", ServerController.LogType.ERROR);
-                return createErrorResponse(404, "Usuário não encontrado.");
+                return createErrorResponse(404, "");
             }
         } catch (SQLException e) {
             controller.log("Erro de banco de dados ao excluir usuário '" + userFromToken + "': " + e.getMessage(), ServerController.LogType.ERROR);
@@ -208,7 +206,7 @@ public class ClientHandler implements Runnable {
         String userFromToken = JwtUtil.getUsernameFromToken(token);
 
         if (userFromToken == null) {
-            return createErrorResponse(401, "Token inválido ou expirado.");
+            return createErrorResponse(401, "");
         }
 
         JSONObject response = new JSONObject();
