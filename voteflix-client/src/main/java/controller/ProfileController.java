@@ -11,7 +11,7 @@ import javafx.stage.Stage;
 import network.ServerConnection;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler; // <-- IMPORTAÇÃO ADICIONADA
+import util.StatusCodeHandler;
 
 import java.util.Optional;
 
@@ -34,11 +34,6 @@ public class ProfileController {
 
         Optional<String> result = dialog.showAndWait();
         result.ifPresent(newPassword -> {
-            if (newPassword.trim().isEmpty()) {
-                showAlert(Alert.AlertType.ERROR, "Erro", "A senha não pode ser vazia.");
-                return;
-            }
-
             statusLabel.setText("Atualizando senha...");
             Task<String> updateTask = new Task<>() {
                 @Override
@@ -47,7 +42,7 @@ public class ProfileController {
                     return ServerConnection.getInstance().updateOwnPassword(newPassword, token);
                 }
             };
-            updateTask.setOnSucceeded(e -> handleGenericResponse(updateTask.getValue(), "Senha atualizada com sucesso!"));
+            updateTask.setOnSucceeded(e -> handleUpdatePasswordResponse(updateTask.getValue()));
             new Thread(updateTask).start();
         });
     }
@@ -87,24 +82,6 @@ public class ProfileController {
     }
 
     @FXML
-    private void handleLogout() {
-        statusLabel.setText("Saindo...");
-        Task<String> logoutTask = new Task<>() {
-            @Override
-            protected String call() {
-                String token = SessionManager.getInstance().getToken();
-                return ServerConnection.getInstance().logout(token);
-            }
-        };
-        logoutTask.setOnSucceeded(e -> {
-            SessionManager.getInstance().clearSession();
-            showAlert(Alert.AlertType.INFORMATION, "Logout", "Você foi desconectado com sucesso.");
-            closeWindow();
-        });
-        new Thread(logoutTask).start();
-    }
-
-    @FXML
     private void handleDeleteAccount() {
         Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
         confirmation.setTitle("Confirmar Exclusão");
@@ -114,9 +91,15 @@ public class ProfileController {
         Optional<ButtonType> result = confirmation.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
             statusLabel.setText("Apagando conta...");
-            Task<String> deleteTask = createDeleteTask();
+            Task<Void> deleteTask = new Task<>() {
+                @Override
+                protected Void call() {
+                    String token = SessionManager.getInstance().getToken();
+                    ServerConnection.getInstance().deleteOwnUser(token);
+                    return null;
+                }
+            };
             deleteTask.setOnSucceeded(e -> {
-                handleGenericResponse(deleteTask.getValue(), "Conta apagada com sucesso.");
                 SessionManager.getInstance().clearSession();
                 closeWindow();
             });
@@ -124,17 +107,7 @@ public class ProfileController {
         }
     }
 
-    private Task<String> createDeleteTask() {
-        return new Task<>() {
-            @Override
-            protected String call() {
-                String token = SessionManager.getInstance().getToken();
-                return ServerConnection.getInstance().deleteOwnUser(token);
-            }
-        };
-    }
-
-    private void handleGenericResponse(String responseJson, String successMessage) {
+    private void handleUpdatePasswordResponse(String responseJson) {
         Platform.runLater(() -> {
             statusLabel.setText("");
             if (responseJson == null) {
@@ -144,9 +117,8 @@ public class ProfileController {
             JSONObject response = new JSONObject(responseJson);
             String status = response.getString("status");
             if ("200".equals(status)) {
-                showAlert(Alert.AlertType.INFORMATION, "Sucesso", successMessage);
+                showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Senha atualizada com sucesso!");
             } else {
-                // --- LÓGICA DE ERRO ATUALIZADA ---
                 String serverMessage = response.optString("mensagem");
                 String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
                 showAlert(Alert.AlertType.ERROR, "Erro", "Ocorreu um erro: " + finalMessage);

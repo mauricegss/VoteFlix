@@ -27,8 +27,6 @@ public class LoginController {
         String username = usernameField.getText();
         String password = passwordField.getText();
 
-        // --- CORREÇÃO: Verificação de campos vazios foi REMOVIDA ---
-
         statusLabel.setText("Autenticando...");
         loginButton.setDisable(true);
 
@@ -60,7 +58,7 @@ public class LoginController {
                 if ("200".equals(status)) {
                     String token = response.getString("token");
                     SessionManager.getInstance().setToken(token);
-                    openProfileWindow();
+                    openMainWindow();
                 } else {
                     String serverMessage = response.optString("mensagem");
                     String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
@@ -77,8 +75,6 @@ public class LoginController {
     protected void handleRegisterButtonAction() {
         String username = usernameField.getText();
         String password = passwordField.getText();
-
-        // --- CORREÇÃO: Verificação de campos vazios foi REMOVIDA ---
 
         statusLabel.setText("Cadastrando...");
         Task<String> registerTask = new Task<>() {
@@ -102,26 +98,26 @@ public class LoginController {
         new Thread(registerTask).start();
     }
 
-    private void openProfileWindow() {
+    private void openMainWindow() {
         try {
             Stage currentStage = (Stage) loginButton.getScene().getWindow();
             currentStage.close();
 
-            URL fxmlLocation = getClass().getResource("/view/ProfileView.fxml");
+            URL fxmlLocation = getClass().getResource("/view/MainView.fxml");
             FXMLLoader loader = new FXMLLoader(fxmlLocation);
 
             if (fxmlLocation == null) {
-                showAlert(Alert.AlertType.ERROR, "Erro Crítico", "Não foi possível encontrar o arquivo da tela de perfil: /view/ProfileView.fxml");
+                showAlert(Alert.AlertType.ERROR, "Erro Crítico", "Não foi possível encontrar o arquivo da tela principal: /view/MainView.fxml");
                 return;
             }
 
             Stage stage = new Stage();
-            stage.setTitle("Meu Perfil");
+            stage.setTitle("VoteFlix");
             stage.setScene(new Scene(loader.load()));
             stage.show();
         } catch (IOException e) {
-            System.err.println("Erro ao carregar FXML da tela de perfil: " + e.getMessage());
-            showAlert(Alert.AlertType.ERROR, "Erro ao Carregar Tela", "Ocorreu um erro ao tentar carregar a tela de perfil.");
+            System.err.println("Erro ao carregar FXML da tela principal: " + e.getMessage());
+            showAlert(Alert.AlertType.ERROR, "Erro ao Carregar Tela", "Ocorreu um erro ao tentar carregar a tela principal.");
         }
     }
 

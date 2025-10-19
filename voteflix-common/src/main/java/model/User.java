@@ -1,5 +1,6 @@
 package model;
 
+import org.json.JSONObject;
 import java.io.Serializable;
 
 public class User implements Serializable {
@@ -7,7 +8,6 @@ public class User implements Serializable {
     private int id;
     private String nome;
     private String senha;
-    private String funcao;
 
     public User() {
     }
@@ -36,11 +36,10 @@ public class User implements Serializable {
         this.senha = senha;
     }
 
-    public String getFuncao() {
-        return funcao;
-    }
-
-    public void setFuncao(String funcao) {
-        this.funcao = funcao;
+    public static User fromJson(JSONObject json) {
+        User user = new User();
+        user.setId(Integer.parseInt(json.getString("id")));
+        user.setNome(json.getString("nome"));
+        return user;
     }
 }

@@ -1,6 +1,8 @@
 package network;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public class ServerConnection {
 
@@ -18,7 +21,8 @@ public class ServerConnection {
     private BufferedReader in;
     private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    private ServerConnection() {}
+    private ServerConnection() {
+    }
 
     public static ServerConnection getInstance() {
         if (instance == null) {
@@ -104,13 +108,12 @@ public class ServerConnection {
         return sendRequestAndGetResponse(request.toString());
     }
 
-    public String logout(String token) {
+    public void logout(String token) {
         JSONObject request = new JSONObject();
         request.put("operacao", "LOGOUT");
         request.put("token", token);
-        String response = sendRequestAndGetResponse(request.toString());
+        sendRequestAndGetResponse(request.toString());
         disconnect();
-        return response;
     }
 
     public String updateOwnPassword(String newPassword, String token) {
@@ -123,18 +126,98 @@ public class ServerConnection {
         return sendRequestAndGetResponse(request.toString());
     }
 
-    public String deleteOwnUser(String token) {
+    public void deleteOwnUser(String token) {
         JSONObject request = new JSONObject();
         request.put("operacao", "EXCLUIR_PROPRIO_USUARIO");
         request.put("token", token);
-        String response = sendRequestAndGetResponse(request.toString());
+        sendRequestAndGetResponse(request.toString());
         disconnect();
-        return response;
     }
 
     public String listOwnUser(String token) {
         JSONObject request = new JSONObject();
         request.put("operacao", "LISTAR_PROPRIO_USUARIO");
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String createMovie(String token, String titulo, String diretor, String ano, List<String> generos, String sinopse) {
+        JSONObject movie = new JSONObject();
+        movie.put("titulo", titulo);
+        movie.put("diretor", diretor);
+        movie.put("ano", ano);
+        movie.put("genero", new JSONArray(generos));
+        movie.put("sinopse", sinopse);
+
+        JSONObject request = new JSONObject();
+        request.put("operacao", "CRIAR_FILME");
+        request.put("filme", movie);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String listMovies(String token) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "LISTAR_FILMES");
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String getMovieById(String token, String movieId) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "BUSCAR_FILME_ID");
+        request.put("id_filme", movieId);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String updateMovie(String token, String id, String titulo, String diretor, String ano, List<String> generos, String sinopse) {
+        JSONObject movie = new JSONObject();
+        movie.put("id", id);
+        movie.put("titulo", titulo);
+        movie.put("diretor", diretor);
+        movie.put("ano", ano);
+        movie.put("genero", new JSONArray(generos));
+        movie.put("sinopse", sinopse);
+
+        JSONObject request = new JSONObject();
+        request.put("operacao", "EDITAR_FILME");
+        request.put("filme", movie);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String deleteMovie(String token, String id) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "EXCLUIR_FILME");
+        request.put("id", id);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String listUsers(String token) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "LISTAR_USUARIOS");
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String adminEditUser(String token, String userId, String newPassword) {
+        JSONObject user = new JSONObject();
+        user.put("senha", newPassword);
+
+        JSONObject request = new JSONObject();
+        request.put("operacao", "ADMIN_EDITAR_USUARIO");
+        request.put("id", userId);
+        request.put("usuario", user);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String adminDeleteUser(String token, String userId) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "ADMIN_EXCLUIR_USUARIO");
+        request.put("id", userId);
         request.put("token", token);
         return sendRequestAndGetResponse(request.toString());
     }

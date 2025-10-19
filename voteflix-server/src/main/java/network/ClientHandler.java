@@ -1,8 +1,11 @@
 package network;
 
 import controller.ServerController;
+import dao.MovieDAO;
 import dao.UserDAO;
+import model.Movie;
 import model.User;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.JwtUtil;
@@ -13,11 +16,14 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.SocketException;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
     private final ServerController controller;
     private final UserDAO userDAO;
+    private final MovieDAO movieDAO;
     private final Server server;
     private PrintWriter out;
     private BufferedReader in;
@@ -29,6 +35,7 @@ public class ClientHandler implements Runnable {
         this.controller = controller;
         this.server = server;
         this.userDAO = new UserDAO();
+        this.movieDAO = new MovieDAO();
     }
 
     @Override
@@ -62,171 +69,344 @@ public class ClientHandler implements Runnable {
             JSONObject request = new JSONObject(jsonRequest);
             String operacao = request.getString("operacao");
 
+            switch (operacao) {
+                case "LOGIN":
+                    return handleLogin(request);
+                case "CRIAR_USUARIO":
+                    return handleCreateUser(request);
+            }
+
+            String token = request.optString("token");
+            if (token.isEmpty()) {
+                return createErrorResponse(401);
+            }
+            String userFromToken = JwtUtil.getUsernameFromToken(token);
+            if (userFromToken == null) {
+                return createErrorResponse(401);
+            }
+
+            switch (operacao) {
+                case "LOGOUT":
+                    return handleLogout();
+                case "EDITAR_PROPRIO_USUARIO":
+                    return handleUpdateOwnPassword(request, userFromToken);
+                case "EXCLUIR_PROPRIO_USUARIO":
+                    return handleDeleteOwnUser(userFromToken);
+                case "LISTAR_PROPRIO_USUARIO":
+                    return handleListOwnUser(userFromToken);
+                case "LISTAR_FILMES":
+                    return handleListMovies();
+                case "BUSCAR_FILME_ID":
+                    return handleGetMovieById(request);
+            }
+
+            if (!"admin".equals(userFromToken)) {
+                return createErrorResponse(403);
+            }
+
             return switch (operacao) {
-                case "LOGIN" -> handleLogin(request);
-                case "CRIAR_USUARIO" -> handleCreateUser(request);
-                case "LOGOUT" -> handleLogout(request);
-                case "EDITAR_PROPRIO_USUARIO" -> handleUpdatePassword(request);
-                case "EXCLUIR_PROPRIO_USUARIO" -> handleDeleteUser(request);
-                case "LISTAR_PROPRIO_USUARIO" -> handleListOwnUser(request);
-                default -> {
-                    controller.log("Recebida operação desconhecida: '" + operacao + "' de " + getIdentifier(), ServerController.LogType.ERROR);
-                    yield createErrorResponse(400, "Operação desconhecida.");
-                }
+                case "CRIAR_FILME" -> handleCreateMovie(request);
+                case "EDITAR_FILME" -> handleUpdateMovie(request);
+                case "EXCLUIR_FILME" -> handleDeleteMovie(request);
+                case "LISTAR_USUARIOS" -> handleListUsers();
+                case "ADMIN_EDITAR_USUARIO" -> handleAdminEditUser(request);
+                case "ADMIN_EXCLUIR_USUARIO" -> handleAdminDeleteUser(request);
+                default -> createErrorResponse(400);
             };
+
         } catch (JSONException e) {
-            controller.log("Recebido JSON inválido de " + getIdentifier() + ": " + e.getMessage(), ServerController.LogType.ERROR);
-            return createErrorResponse(400, "Requisição JSON inválida.");
+            return createErrorResponse(400);
         }
     }
 
     private String handleLogin(JSONObject request) {
-        String user = request.getString("usuario");
-        String pass = request.getString("senha");
-
-        controller.log("Tentativa de login para o usuário '" + user + "'.", ServerController.LogType.INFO);
         try {
+            String user = request.getString("usuario");
+            String pass = request.getString("senha");
+
             User foundUser = userDAO.findByUsername(user);
             if (foundUser != null && foundUser.getSenha().equals(pass)) {
                 this.username = user;
                 String userWithIp = String.format("%s (%s)", user, clientSocket.getInetAddress().getHostAddress());
                 server.addAuthenticatedUser(userWithIp);
 
-                String token = JwtUtil.generateToken(user);
-                JSONObject response = new JSONObject();
-                response.put("status", "200");
-                response.put("mensagem", "Login bem-sucedido.");
+                String role = "admin".equals(user) ? "admin" : "user";
+                String token = JwtUtil.generateToken(user, role);
+
+                JSONObject response = createSuccessResponse("200", "Login bem-sucedido.");
                 response.put("token", token);
-                controller.log("Usuário '" + user + "' autenticado com sucesso.", ServerController.LogType.CONNECTION);
                 return response.toString();
             } else {
-                controller.log("Falha na autenticação para o usuário '" + user + "'.", ServerController.LogType.ERROR);
-                return createErrorResponse(401, "");
+                return createErrorResponse(401);
             }
         } catch (SQLException e) {
-            controller.log("Erro de banco de dados ao buscar usuário '" + user + "': " + e.getMessage(), ServerController.LogType.ERROR);
-            return createErrorResponse(500, "Erro interno no servidor.");
+            return createErrorResponse(500);
+        } catch (JSONException e) {
+            return createErrorResponse(400);
         }
     }
 
     private String handleCreateUser(JSONObject request) {
-        JSONObject userJson = request.getJSONObject("usuario");
-        String username = userJson.getString("nome");
-        String password = userJson.getString("senha");
-
-        if (username.length() < 3 || username.length() > 20 || password.length() < 3 || password.length() > 20) {
-            return createErrorResponse(422, "");
-        }
-
-        User newUser = new User();
-        newUser.setNome(username);
-        newUser.setSenha(password);
-
-        controller.log("Tentativa de criar usuário '" + newUser.getNome() + "'.", ServerController.LogType.INFO);
-        if (userDAO.createUser(newUser)) {
-            controller.log("Usuário '" + newUser.getNome() + "' criado com sucesso no banco de dados.", ServerController.LogType.INFO);
-            JSONObject response = new JSONObject();
-            response.put("status", "201");
-            response.put("mensagem", "Usuário criado com sucesso.");
-            return response.toString();
-        } else {
-            controller.log("Falha ao criar usuário '" + newUser.getNome() + "'. Usuário já existe.", ServerController.LogType.ERROR);
-            return createErrorResponse(409, "");
-        }
-    }
-
-    private String handleLogout(JSONObject request) {
-        String token = request.getString("token");
-        String userFromToken = JwtUtil.getUsernameFromToken(token);
-        if (userFromToken != null) {
-            controller.log("Usuário '" + userFromToken + "' fez logout.", ServerController.LogType.DISCONNECTION);
-        }
-        this.needsToClose = true;
-        JSONObject response = new JSONObject();
-        response.put("status", "200");
-        response.put("mensagem", "Logout realizado com sucesso.");
-        return response.toString();
-    }
-
-    private String handleUpdatePassword(JSONObject request) {
-        String token = request.getString("token");
-        String userFromToken = JwtUtil.getUsernameFromToken(token);
-        if (userFromToken == null) {
-            controller.log("Tentativa de alteração de senha com token inválido por " + getIdentifier(), ServerController.LogType.ERROR);
-            return createErrorResponse(401, "");
-        }
-
-        controller.log("Usuário '" + userFromToken + "' solicitou alteração de senha.", ServerController.LogType.INFO);
-        String newPassword = request.getJSONObject("usuario").getString("senha");
-
-        if (newPassword.length() < 3 || newPassword.length() > 20) {
-            return createErrorResponse(422, "");
-        }
-
         try {
+            JSONObject userJson = request.getJSONObject("usuario");
+            String username = userJson.getString("nome");
+            String password = userJson.getString("senha");
+
+            if (isInvalidUserFields(username, password)) {
+                return createErrorResponse(422);
+            }
+            if ("admin".equalsIgnoreCase(username)) {
+                return createErrorResponse(403);
+            }
+
+            User newUser = new User();
+            newUser.setNome(username);
+            newUser.setSenha(password);
+            userDAO.createUser(newUser);
+            return createSuccessResponse("201", "Usuário criado com sucesso.").toString();
+
+        } catch (SQLException e) {
+            return createErrorResponse(409);
+        } catch (JSONException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleUpdateOwnPassword(JSONObject request, String userFromToken) {
+        try {
+            String newPassword = request.getJSONObject("usuario").getString("senha");
+            if (isInvalidUserFields(userFromToken, newPassword)) {
+                return createErrorResponse(422);
+            }
             if (userDAO.updatePassword(userFromToken, newPassword)) {
-                controller.log("Senha do usuário '" + userFromToken + "' alterada com sucesso.", ServerController.LogType.INFO);
-                return createSuccessResponse("Senha alterada com sucesso.");
+                return createSuccessResponse("200", "Senha alterada com sucesso.").toString();
             } else {
-                controller.log("Falha ao alterar a senha do usuário '" + userFromToken + "'. Usuário não encontrado.", ServerController.LogType.ERROR);
-                return createErrorResponse(404, "");
+                return createErrorResponse(404);
             }
         } catch (SQLException e) {
-            controller.log("Erro de banco de dados ao atualizar senha para '" + userFromToken + "': " + e.getMessage(), ServerController.LogType.ERROR);
-            return createErrorResponse(500, "Erro interno no servidor.");
+            return createErrorResponse(500);
+        } catch (JSONException e) {
+            return createErrorResponse(400);
         }
     }
 
-    private String handleDeleteUser(JSONObject request) {
-        String token = request.getString("token");
-        String userFromToken = JwtUtil.getUsernameFromToken(token);
-        if (userFromToken == null) {
-            controller.log("Tentativa de exclusão de conta com token inválido por " + getIdentifier(), ServerController.LogType.ERROR);
-            return createErrorResponse(401, "");
-        }
-
-        controller.log("Usuário '" + userFromToken + "' solicitou a exclusão da própria conta.", ServerController.LogType.INFO);
+    private String handleDeleteOwnUser(String userFromToken) {
         try {
             if (userDAO.deleteUser(userFromToken)) {
                 this.needsToClose = true;
-                controller.log("Usuário '" + userFromToken + "' foi excluído.", ServerController.LogType.DISCONNECTION);
-                return createSuccessResponse("Usuário excluído com sucesso.");
+                return createSuccessResponse("200", "Usuário excluído com sucesso.").toString();
             } else {
-                controller.log("Falha ao excluir o usuário '" + userFromToken + "'. Usuário não encontrado.", ServerController.LogType.ERROR);
-                return createErrorResponse(404, "");
+                return createErrorResponse(404);
             }
         } catch (SQLException e) {
-            controller.log("Erro de banco de dados ao excluir usuário '" + userFromToken + "': " + e.getMessage(), ServerController.LogType.ERROR);
-            return createErrorResponse(500, "Erro interno no servidor.");
+            return createErrorResponse(500);
         }
     }
 
-    private String handleListOwnUser(JSONObject request) {
-        String token = request.getString("token");
-        String userFromToken = JwtUtil.getUsernameFromToken(token);
-
-        if (userFromToken == null) {
-            return createErrorResponse(401, "");
-        }
-
+    private String handleListOwnUser(String userFromToken) {
         JSONObject response = new JSONObject();
         response.put("status", "200");
         response.put("usuario", userFromToken);
         return response.toString();
     }
 
-    private String createErrorResponse(int status, String message) {
+    private String handleCreateMovie(JSONObject request) {
+        try {
+            JSONObject movieJson = request.getJSONObject("filme");
+            if (isInvalidMovieFields(movieJson)) {
+                return createErrorResponse(422);
+            }
+            Movie movie = movieFromJson(movieJson);
+            movieDAO.createMovie(movie);
+            return createSuccessResponse("201", "Filme criado com sucesso.").toString();
+        } catch (SQLException e) {
+            return createErrorResponse(409);
+        } catch (JSONException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleUpdateMovie(JSONObject request) {
+        try {
+            JSONObject movieJson = request.getJSONObject("filme");
+            if (isInvalidMovieFields(movieJson) || !movieJson.has("id")) {
+                return createErrorResponse(422);
+            }
+            Movie movie = movieFromJson(movieJson);
+            if (movieDAO.updateMovie(movie)) {
+                return createSuccessResponse("200", "Filme atualizado com sucesso.").toString();
+            } else {
+                return createErrorResponse(404);
+            }
+        } catch (SQLException e) {
+            return createErrorResponse(409);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleDeleteMovie(JSONObject request) {
+        try {
+            int id = Integer.parseInt(request.getString("id"));
+            if (movieDAO.deleteMovie(id)) {
+                return createSuccessResponse("200", "Filme excluído com sucesso.").toString();
+            } else {
+                return createErrorResponse(404);
+            }
+        } catch (SQLException e) {
+            return createErrorResponse(500);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleGetMovieById(JSONObject request) {
+        try {
+            int id = Integer.parseInt(request.getString("id_filme"));
+            Movie movie = movieDAO.findMovieById(id);
+            if (movie == null) {
+                return createErrorResponse(404);
+            }
+            JSONObject response = new JSONObject();
+            response.put("status", "200");
+            response.put("filme", jsonFromMovie(movie));
+            response.put("reviews", new JSONArray());
+            return response.toString();
+        } catch (NumberFormatException | JSONException e) {
+            return createErrorResponse(400);
+        } catch (SQLException e) {
+            return createErrorResponse(500);
+        }
+    }
+
+    private String handleListMovies() {
+        try {
+            List<Movie> movies = movieDAO.listMovies();
+            JSONArray moviesJson = new JSONArray();
+            for (Movie movie : movies) {
+                moviesJson.put(jsonFromMovie(movie));
+            }
+            JSONObject response = new JSONObject();
+            response.put("status", "200");
+            response.put("filmes", moviesJson);
+            return response.toString();
+        } catch (SQLException e) {
+            return createErrorResponse(500);
+        }
+    }
+
+    private String handleListUsers() {
+        try {
+            List<User> users = userDAO.listAllUsers();
+            JSONArray usersJson = new JSONArray();
+            for (User user : users) {
+                JSONObject userJson = new JSONObject();
+                userJson.put("id", String.valueOf(user.getId()));
+                userJson.put("nome", user.getNome());
+                usersJson.put(userJson);
+            }
+            JSONObject response = new JSONObject();
+            response.put("status", "200");
+            response.put("usuarios", usersJson);
+            return response.toString();
+        } catch (SQLException e) {
+            return createErrorResponse(500);
+        }
+    }
+
+    private String handleAdminEditUser(JSONObject request) {
+        try {
+            int userId = Integer.parseInt(request.getString("id"));
+            String newPassword = request.getJSONObject("usuario").getString("senha");
+            if (isInvalidUserFields("tempuser", newPassword)) {
+                return createErrorResponse(422);
+            }
+            if (userDAO.updateUserPasswordById(userId, newPassword)) {
+                return createSuccessResponse("200", "Senha do usuário atualizada com sucesso.").toString();
+            } else {
+                return createErrorResponse(404);
+            }
+        } catch (SQLException e) {
+            return createErrorResponse(500);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleAdminDeleteUser(JSONObject request) {
+        try {
+            int userId = Integer.parseInt(request.getString("id"));
+            if (userDAO.deleteUserById(userId)) {
+                return createSuccessResponse("200", "Usuário excluído com sucesso.").toString();
+            } else {
+                return createErrorResponse(404);
+            }
+        } catch (SQLException e) {
+            return createErrorResponse(500);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleLogout() {
+        this.needsToClose = true;
+        return createSuccessResponse("200", "Logout realizado com sucesso.").toString();
+    }
+
+    private boolean isInvalidUserFields(String username, String password) {
+        return username.isEmpty() || username.length() > 20 || !username.matches("[a-zA-Z0-9]+") ||
+                password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
+    }
+
+    private boolean isInvalidMovieFields(JSONObject movieJson) {
+        return movieJson.optString("titulo").length() > 30 || movieJson.optString("titulo").isEmpty() ||
+                !movieJson.optString("ano").matches("\\d{4}") ||
+                movieJson.optString("sinopse").length() > 250 ||
+                movieJson.optString("diretor").isEmpty() ||
+                movieJson.optJSONArray("genero") == null || movieJson.optJSONArray("genero").isEmpty();
+    }
+
+    private Movie movieFromJson(JSONObject json) {
+        Movie movie = new Movie();
+        if (json.has("id")) movie.setId(Integer.parseInt(json.getString("id")));
+        movie.setTitulo(json.getString("titulo"));
+        movie.setDiretor(json.getString("diretor"));
+        movie.setAno(json.getString("ano"));
+        movie.setSinopse(json.getString("sinopse"));
+
+        JSONArray generosJson = json.getJSONArray("genero");
+        List<String> generos = new ArrayList<>();
+        for (int i = 0; i < generosJson.length(); i++) {
+            generos.add(generosJson.getString(i));
+        }
+        movie.setGeneros(generos);
+        return movie;
+    }
+
+    private JSONObject jsonFromMovie(Movie movie) {
+        JSONObject movieJson = new JSONObject();
+        movieJson.put("id", String.valueOf(movie.getId()));
+        movieJson.put("titulo", movie.getTitulo());
+        movieJson.put("diretor", movie.getDiretor());
+        movieJson.put("ano", movie.getAno());
+        movieJson.put("genero", new JSONArray(movie.getGeneros()));
+        movieJson.put("sinopse", movie.getSinopse());
+        movieJson.put("nota", String.format("%.1f", movie.getNota()));
+        movieJson.put("qtd_avaliacoes", String.valueOf(movie.getQtdAvaliacoes()));
+        return movieJson;
+    }
+
+    private String createErrorResponse(int status) {
         JSONObject errorResponse = new JSONObject();
         errorResponse.put("status", String.valueOf(status));
-        errorResponse.put("mensagem", message);
         return errorResponse.toString();
     }
 
-    private String createSuccessResponse(String message) {
+    private JSONObject createSuccessResponse(String status, String message) {
         JSONObject response = new JSONObject();
-        response.put("status", "200");
+        response.put("status", status);
         response.put("mensagem", message);
-        return response.toString();
+        return response;
     }
 
     public void closeConnection() {
@@ -241,16 +421,9 @@ public class ClientHandler implements Runnable {
             controller.log("Conexão com " + getIdentifier() + " fechada.", ServerController.LogType.DISCONNECTION);
         }
     }
-
     public String getIdentifier() {
         return username != null ? username : clientSocket.getInetAddress().toString();
     }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getClientIpAddress() {
-        return clientSocket.getInetAddress().getHostAddress();
-    }
+    public String getUsername() { return username; }
+    public String getClientIpAddress() { return clientSocket.getInetAddress().getHostAddress(); }
 }
