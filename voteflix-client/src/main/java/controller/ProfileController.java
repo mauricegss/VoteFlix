@@ -14,7 +14,6 @@ import javafx.stage.Stage;
 import network.ServerConnection;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler;
 
 import java.util.Optional;
 
@@ -75,7 +74,7 @@ public class ProfileController {
                 String username = response.getString("usuario");
                 showAlert(Alert.AlertType.INFORMATION, "Informações do Usuário", "Seu nome de usuário é: " + username);
             } else {
-                String finalMessage = StatusCodeHandler.getMessage(status);
+                String finalMessage = response.optString("mensagem", "Erro ao listar usuário.");
                 showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
             }
         });
@@ -121,7 +120,7 @@ public class ProfileController {
             if ("200".equals(status)) {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Senha atualizada com sucesso!");
             } else {
-                String finalMessage = StatusCodeHandler.getMessage(status);
+                String finalMessage = response.optString("mensagem", "Ocorreu um erro ao atualizar a senha.");
                 showAlert(Alert.AlertType.ERROR, "Erro", "Ocorreu um erro: " + finalMessage);
             }
         });

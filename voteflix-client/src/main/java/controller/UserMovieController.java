@@ -23,7 +23,6 @@ import network.ServerConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler;
 
 import java.io.IOException;
 
@@ -78,7 +77,8 @@ public class UserMovieController {
                         movieList.add(Movie.fromJson(movies.getJSONObject(i)));
                     }
                 } else {
-                    showErrorAlert("Não foi possível carregar os filmes.");
+                    String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
+                    showErrorAlert(message);
                 }
             });
         });
@@ -134,7 +134,7 @@ public class UserMovieController {
                 Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
                 showDetailsWindow(detailedMovie);
             } else {
-                String message = StatusCodeHandler.getMessage(status);
+                String message = response.optString("mensagem", "Erro ao buscar filme por ID.");
                 showErrorAlert(message);
             }
         });

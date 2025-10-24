@@ -18,6 +18,8 @@ import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
@@ -29,6 +31,19 @@ public class ClientHandler implements Runnable {
     private BufferedReader in;
     private String username;
     private boolean needsToClose = false;
+
+    private static final Map<String, String> RESPONSE_MESSAGES = new HashMap<>();
+    static {
+        RESPONSE_MESSAGES.put("200", "Sucesso: operação realizada com sucesso");
+        RESPONSE_MESSAGES.put("201", "Sucesso: Recurso cadastrado");
+        RESPONSE_MESSAGES.put("400", "Erro: Operação não encontrada ou inválida");
+        RESPONSE_MESSAGES.put("401", "Erro: Token inválido");
+        RESPONSE_MESSAGES.put("403", "Erro: sem permissão");
+        RESPONSE_MESSAGES.put("404", "Erro: Recurso inexistente");
+        RESPONSE_MESSAGES.put("409", "Erro: Recurso ja existe");
+        RESPONSE_MESSAGES.put("422", "Erro: Chaves faltantes ou invalidas");
+        RESPONSE_MESSAGES.put("500", "Erro: Falha interna do servidor");
+    }
 
     public ClientHandler(Socket socket, ServerController controller, Server server) {
         this.clientSocket = socket;
@@ -131,7 +146,7 @@ public class ClientHandler implements Runnable {
                 server.addAuthenticatedUser(userWithIp);
 
                 String role = "admin".equals(user) ? "admin" : "user";
-                String token = JwtUtil.generateToken(user, role);
+                String token = JwtUtil.generateToken(user, role, foundUser.getId());
 
                 JSONObject response = createSuccessResponse("200");
                 response.put("token", token);
@@ -192,6 +207,10 @@ public class ClientHandler implements Runnable {
 
     private String handleDeleteOwnUser(String userFromToken) {
         try {
+            if ("admin".equalsIgnoreCase(userFromToken)) {
+                return createErrorResponse(403);
+            }
+
             if (userDAO.deleteUser(userFromToken)) {
                 this.needsToClose = true;
                 return createSuccessResponse("200").toString();
@@ -204,8 +223,7 @@ public class ClientHandler implements Runnable {
     }
 
     private String handleListOwnUser(String userFromToken) {
-        JSONObject response = new JSONObject();
-        response.put("status", "200");
+        JSONObject response = createSuccessResponse("200");
         response.put("usuario", userFromToken);
         return response.toString();
     }
@@ -267,8 +285,7 @@ public class ClientHandler implements Runnable {
             if (movie == null) {
                 return createErrorResponse(404);
             }
-            JSONObject response = new JSONObject();
-            response.put("status", "200");
+            JSONObject response = createSuccessResponse("200");
             response.put("filme", jsonFromMovie(movie));
             response.put("reviews", new JSONArray());
             return response.toString();
@@ -286,8 +303,7 @@ public class ClientHandler implements Runnable {
             for (Movie movie : movies) {
                 moviesJson.put(jsonFromMovie(movie));
             }
-            JSONObject response = new JSONObject();
-            response.put("status", "200");
+            JSONObject response = createSuccessResponse("200");
             response.put("filmes", moviesJson);
             return response.toString();
         } catch (SQLException e) {
@@ -305,8 +321,7 @@ public class ClientHandler implements Runnable {
                 userJson.put("nome", user.getNome());
                 usersJson.put(userJson);
             }
-            JSONObject response = new JSONObject();
-            response.put("status", "200");
+            JSONObject response = createSuccessResponse("200");
             response.put("usuarios", usersJson);
             return response.toString();
         } catch (SQLException e) {
@@ -336,6 +351,11 @@ public class ClientHandler implements Runnable {
     private String handleAdminDeleteUser(JSONObject request) {
         try {
             int userId = Integer.parseInt(request.getString("id"));
+
+            if (userId == 1) {
+                return createErrorResponse(403);
+            }
+
             if (userDAO.deleteUserById(userId)) {
                 return createSuccessResponse("200").toString();
             } else {
@@ -397,14 +417,17 @@ public class ClientHandler implements Runnable {
     }
 
     private String createErrorResponse(int status) {
+        String statusCode = String.valueOf(status);
         JSONObject errorResponse = new JSONObject();
-        errorResponse.put("status", String.valueOf(status));
+        errorResponse.put("status", statusCode);
+        errorResponse.put("mensagem", RESPONSE_MESSAGES.getOrDefault(statusCode, "Erro: Erro desconhecido"));
         return errorResponse.toString();
     }
 
     private JSONObject createSuccessResponse(String status) {
         JSONObject response = new JSONObject();
         response.put("status", status);
+        response.put("mensagem", RESPONSE_MESSAGES.getOrDefault(status, "Sucesso: operação realizada com sucesso"));
         return response;
     }
 

@@ -11,7 +11,7 @@ import network.ServerConnection;
 import org.json.JSONException;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler;
+
 import java.io.IOException;
 import java.net.URL;
 
@@ -60,7 +60,7 @@ public class LoginController {
                     SessionManager.getInstance().setToken(token);
                     openMainWindow();
                 } else {
-                    String finalMessage = StatusCodeHandler.getMessage(status);
+                    String finalMessage = response.optString("mensagem", "Erro desconhecido.");
                     statusLabel.setText(finalMessage);
                 }
             } catch (JSONException e) {
@@ -88,7 +88,7 @@ public class LoginController {
             if ("201".equals(status)) {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário '" + username + "' cadastrado! Agora você pode fazer o login.");
             } else {
-                String finalMessage = StatusCodeHandler.getMessage(status);
+                String finalMessage = response.optString("mensagem", "Erro no cadastro.");
                 showAlert(Alert.AlertType.ERROR, "Erro", "Não foi possível cadastrar: " + finalMessage);
             }
             statusLabel.setText("");

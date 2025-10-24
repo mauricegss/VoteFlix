@@ -11,7 +11,6 @@ import model.Movie;
 import network.ServerConnection;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler;
 
 import java.util.Arrays;
 import java.util.List;
@@ -81,7 +80,7 @@ public class MovieFormController {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Filme salvo com sucesso.");
                 dialogStage.close();
             } else {
-                String finalMessage = StatusCodeHandler.getMessage(status);
+                String finalMessage = response.optString("mensagem", "Erro ao salvar filme.");
                 showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
             }
         });

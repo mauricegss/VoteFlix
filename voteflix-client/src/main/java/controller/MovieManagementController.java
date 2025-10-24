@@ -24,7 +24,6 @@ import network.ServerConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -85,7 +84,8 @@ public class MovieManagementController {
                         movieList.add(Movie.fromJson(movies.getJSONObject(i)));
                     }
                 } else {
-                    showErrorAlert("Não foi possível carregar os filmes.");
+                    String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
+                    showErrorAlert(message);
                 }
             });
         });
@@ -165,8 +165,8 @@ public class MovieManagementController {
                 Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
                 showDetailsWindow(detailedMovie);
             } else {
-                String status = response.getString("status");
-                showErrorAlert(StatusCodeHandler.getMessage(status));
+                String message = response.optString("mensagem", "Erro ao buscar detalhes do filme.");
+                showErrorAlert(message);
             }
         });
 
@@ -229,7 +229,7 @@ public class MovieManagementController {
                         loadMovies();
                     });
                 } else {
-                    String finalMessage = StatusCodeHandler.getMessage(status);
+                    String finalMessage = response.optString("mensagem", "Erro ao excluir filme.");
                     Platform.runLater(() -> showErrorAlert(finalMessage));
                 }
             });

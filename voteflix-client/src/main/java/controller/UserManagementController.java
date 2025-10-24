@@ -20,7 +20,6 @@ import network.ServerConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.StatusCodeHandler;
 
 import java.util.Optional;
 
@@ -61,7 +60,8 @@ public class UserManagementController {
                         userList.add(User.fromJson(users.getJSONObject(i)));
                     }
                 } else {
-                    showAlert(Alert.AlertType.ERROR, "Erro", "Não foi possível carregar os usuários.");
+                    String message = response.optString("mensagem", "Não foi possível carregar os usuários.");
+                    showAlert(Alert.AlertType.ERROR, "Erro", message);
                 }
             });
         });
@@ -120,7 +120,7 @@ public class UserManagementController {
                 if ("200".equals(status)) {
                     showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Senha atualizada com sucesso.");
                 } else {
-                    String finalMessage = StatusCodeHandler.getMessage(status);
+                    String finalMessage = response.optString("mensagem", "Erro ao atualizar senha.");
                     showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
                 }
             });
@@ -150,7 +150,7 @@ public class UserManagementController {
                     showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário excluído com sucesso.");
                     loadUsers();
                 } else {
-                    String finalMessage = StatusCodeHandler.getMessage(status);
+                    String finalMessage = response.optString("mensagem", "Erro ao excluir usuário.");
                     showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
                 }
             });
