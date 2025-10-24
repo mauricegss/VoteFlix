@@ -120,7 +120,7 @@ public class UserManagementController {
                 if ("200".equals(status)) {
                     showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Senha atualizada com sucesso.");
                 } else {
-                    String finalMessage = response.optString("mensagem", StatusCodeHandler.getMessage(status));
+                    String finalMessage = StatusCodeHandler.getMessage(status);
                     showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
                 }
             });
@@ -150,7 +150,7 @@ public class UserManagementController {
                     showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário excluído com sucesso.");
                     loadUsers();
                 } else {
-                    String finalMessage = response.optString("mensagem", StatusCodeHandler.getMessage(status));
+                    String finalMessage = StatusCodeHandler.getMessage(status);
                     showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
                 }
             });

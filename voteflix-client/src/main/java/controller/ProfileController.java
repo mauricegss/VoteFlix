@@ -1,5 +1,8 @@
 package controller;
 
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
+import java.io.IOException;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -72,8 +75,7 @@ public class ProfileController {
                 String username = response.getString("usuario");
                 showAlert(Alert.AlertType.INFORMATION, "Informações do Usuário", "Seu nome de usuário é: " + username);
             } else {
-                String serverMessage = response.optString("mensagem");
-                String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                String finalMessage = StatusCodeHandler.getMessage(status);
                 showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
             }
         });
@@ -119,8 +121,7 @@ public class ProfileController {
             if ("200".equals(status)) {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Senha atualizada com sucesso!");
             } else {
-                String serverMessage = response.optString("mensagem");
-                String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                String finalMessage = StatusCodeHandler.getMessage(status);
                 showAlert(Alert.AlertType.ERROR, "Erro", "Ocorreu um erro: " + finalMessage);
             }
         });
@@ -135,7 +136,19 @@ public class ProfileController {
     }
 
     private void closeWindow() {
-        Stage stage = (Stage) statusLabel.getScene().getWindow();
-        stage.close();
+        try {
+            Stage currentStage = (Stage) statusLabel.getScene().getWindow();
+            currentStage.close();
+
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/ConnectionView.fxml"));
+            Stage stage = new Stage();
+            stage.setTitle("VoteFlix Client - Conexão");
+            stage.setScene(new Scene(loader.load(), 300, 250));
+            stage.show();
+
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar tela de conexão: " + e.getMessage());
+            Platform.exit();
+        }
     }
 }

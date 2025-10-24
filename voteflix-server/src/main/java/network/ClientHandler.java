@@ -133,7 +133,7 @@ public class ClientHandler implements Runnable {
                 String role = "admin".equals(user) ? "admin" : "user";
                 String token = JwtUtil.generateToken(user, role);
 
-                JSONObject response = createSuccessResponse("200", "Login bem-sucedido.");
+                JSONObject response = createSuccessResponse("200");
                 response.put("token", token);
                 return response.toString();
             } else {
@@ -163,7 +163,7 @@ public class ClientHandler implements Runnable {
             newUser.setNome(username);
             newUser.setSenha(password);
             userDAO.createUser(newUser);
-            return createSuccessResponse("201", "Usuário criado com sucesso.").toString();
+            return createSuccessResponse("201").toString();
 
         } catch (SQLException e) {
             return createErrorResponse(409);
@@ -179,7 +179,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(422);
             }
             if (userDAO.updatePassword(userFromToken, newPassword)) {
-                return createSuccessResponse("200", "Senha alterada com sucesso.").toString();
+                return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
@@ -194,7 +194,7 @@ public class ClientHandler implements Runnable {
         try {
             if (userDAO.deleteUser(userFromToken)) {
                 this.needsToClose = true;
-                return createSuccessResponse("200", "Usuário excluído com sucesso.").toString();
+                return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
@@ -218,7 +218,7 @@ public class ClientHandler implements Runnable {
             }
             Movie movie = movieFromJson(movieJson);
             movieDAO.createMovie(movie);
-            return createSuccessResponse("201", "Filme criado com sucesso.").toString();
+            return createSuccessResponse("201").toString();
         } catch (SQLException e) {
             return createErrorResponse(409);
         } catch (JSONException e) {
@@ -234,7 +234,7 @@ public class ClientHandler implements Runnable {
             }
             Movie movie = movieFromJson(movieJson);
             if (movieDAO.updateMovie(movie)) {
-                return createSuccessResponse("200", "Filme atualizado com sucesso.").toString();
+                return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
@@ -249,7 +249,7 @@ public class ClientHandler implements Runnable {
         try {
             int id = Integer.parseInt(request.getString("id"));
             if (movieDAO.deleteMovie(id)) {
-                return createSuccessResponse("200", "Filme excluído com sucesso.").toString();
+                return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
@@ -322,7 +322,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(422);
             }
             if (userDAO.updateUserPasswordById(userId, newPassword)) {
-                return createSuccessResponse("200", "Senha do usuário atualizada com sucesso.").toString();
+                return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
@@ -337,7 +337,7 @@ public class ClientHandler implements Runnable {
         try {
             int userId = Integer.parseInt(request.getString("id"));
             if (userDAO.deleteUserById(userId)) {
-                return createSuccessResponse("200", "Usuário excluído com sucesso.").toString();
+                return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
@@ -350,11 +350,11 @@ public class ClientHandler implements Runnable {
 
     private String handleLogout() {
         this.needsToClose = true;
-        return createSuccessResponse("200", "Logout realizado com sucesso.").toString();
+        return createSuccessResponse("200").toString();
     }
 
     private boolean isInvalidUserFields(String username, String password) {
-        return username.isEmpty() || username.length() > 20 || !username.matches("[a-zA-Z0-9]+") ||
+        return username.length() < 3 || username.length() > 20 || !username.matches("[a-zA-Z0-9]+") ||
                 password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
     }
 
@@ -402,10 +402,9 @@ public class ClientHandler implements Runnable {
         return errorResponse.toString();
     }
 
-    private JSONObject createSuccessResponse(String status, String message) {
+    private JSONObject createSuccessResponse(String status) {
         JSONObject response = new JSONObject();
         response.put("status", status);
-        response.put("mensagem", message);
         return response;
     }
 

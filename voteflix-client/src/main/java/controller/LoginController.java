@@ -60,8 +60,7 @@ public class LoginController {
                     SessionManager.getInstance().setToken(token);
                     openMainWindow();
                 } else {
-                    String serverMessage = response.optString("mensagem");
-                    String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                    String finalMessage = StatusCodeHandler.getMessage(status);
                     statusLabel.setText(finalMessage);
                 }
             } catch (JSONException e) {
@@ -89,8 +88,7 @@ public class LoginController {
             if ("201".equals(status)) {
                 showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Usuário '" + username + "' cadastrado! Agora você pode fazer o login.");
             } else {
-                String serverMessage = response.optString("mensagem");
-                String finalMessage = serverMessage.isEmpty() ? StatusCodeHandler.getMessage(status) : serverMessage;
+                String finalMessage = StatusCodeHandler.getMessage(status);
                 showAlert(Alert.AlertType.ERROR, "Erro", "Não foi possível cadastrar: " + finalMessage);
             }
             statusLabel.setText("");

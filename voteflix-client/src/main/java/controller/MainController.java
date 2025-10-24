@@ -1,5 +1,7 @@
 package controller;
 
+import javafx.application.Platform;
+import javafx.scene.Scene;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -74,8 +76,20 @@ public class MainController {
         }
         SessionManager.getInstance().clearSession();
 
-        Stage currentStage = (Stage) mainTabPane.getScene().getWindow();
-        currentStage.close();
+        try {
+            Stage currentStage = (Stage) mainTabPane.getScene().getWindow();
+            currentStage.close();
+
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/ConnectionView.fxml"));
+            Stage stage = new Stage();
+            stage.setTitle("VoteFlix Client - Conexão");
+            stage.setScene(new Scene(loader.load(), 300, 250));
+            stage.show();
+
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar tela de conexão: " + e.getMessage());
+            Platform.exit();
+        }
     }
 
     private void showCriticalLoadError() {
