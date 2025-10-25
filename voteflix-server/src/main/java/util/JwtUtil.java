@@ -11,7 +11,7 @@ import java.util.Date;
 public class JwtUtil {
 
     private static final String SECRET = "your-very-secret-key";
-    private static final long EXPIRATION_TIME = 864_000_000; // 10 dias
+    private static final long EXPIRATION_TIME = 864_000_000;
     private static final Algorithm ALGORITHM = Algorithm.HMAC256(SECRET);
 
     public static String generateToken(String username, String role, int userId) {
@@ -37,13 +37,25 @@ public class JwtUtil {
         return (decodedJWT != null) ? decodedJWT.getSubject() : null;
     }
 
+    public static String getRoleFromToken(String token) {
+        DecodedJWT decodedJWT = verifyToken(token);
+        if (decodedJWT != null) {
+            try {
+                return decodedJWT.getClaim("role").asString();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+
     public static Integer getUserIdFromToken(String token) {
         DecodedJWT decodedJWT = verifyToken(token);
         if (decodedJWT != null) {
             try {
                 return decodedJWT.getClaim("id").asInt();
             } catch (Exception e) {
-                // Se a claim "id" não existir ou não for um inteiro
                 return null;
             }
         }

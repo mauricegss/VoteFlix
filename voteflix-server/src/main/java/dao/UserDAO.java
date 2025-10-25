@@ -30,15 +30,25 @@ public class UserDAO {
             pstmt.setString(1, username);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                User user = new User();
-                user.setId(rs.getInt("id"));
-                user.setNome(rs.getString("nome"));
-                user.setSenha(rs.getString("senha"));
-                return user;
+                return mapResultSetToUser(rs);
             }
         }
         return null;
     }
+
+    public User findById(int id) throws SQLException {
+        String sql = "SELECT * FROM usuarios WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return mapResultSetToUser(rs);
+            }
+        }
+        return null;
+    }
+
 
     public boolean updatePassword(String username, String newPassword) throws SQLException {
         String sql = "UPDATE usuarios SET senha = ? WHERE nome = ?";
@@ -92,5 +102,13 @@ public class UserDAO {
             pstmt.setInt(1, userId);
             return pstmt.executeUpdate() > 0;
         }
+    }
+
+    private User mapResultSetToUser(ResultSet rs) throws SQLException {
+        User user = new User();
+        user.setId(rs.getInt("id"));
+        user.setNome(rs.getString("nome"));
+        user.setSenha(rs.getString("senha"));
+        return user;
     }
 }

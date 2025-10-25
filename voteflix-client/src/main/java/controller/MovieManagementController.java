@@ -11,6 +11,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -56,6 +57,7 @@ public class MovieManagementController {
         ratingColumn.setCellValueFactory(new PropertyValueFactory<>("nota"));
         setupActionsColumn();
         moviesTable.setItems(movieList);
+        moviesTable.setPlaceholder(new Label("Carregando filmes..."));
 
         moviesTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             boolean isItemSelected = newSelection != null;
@@ -77,18 +79,38 @@ public class MovieManagementController {
             String responseJson = loadMoviesTask.getValue();
             Platform.runLater(() -> {
                 movieList.clear();
-                JSONObject response = new JSONObject(responseJson);
-                if ("200".equals(response.getString("status"))) {
-                    JSONArray movies = response.getJSONArray("filmes");
-                    for (int i = 0; i < movies.length(); i++) {
-                        movieList.add(Movie.fromJson(movies.getJSONObject(i)));
+                if (responseJson == null) {
+                    showErrorAlert("Erro de comunicação ao carregar filmes.");
+                    moviesTable.setPlaceholder(new Label("Erro ao carregar filmes."));
+                    return;
+                }
+                try {
+                    JSONObject response = new JSONObject(responseJson);
+                    if ("200".equals(response.getString("status"))) {
+                        JSONArray movies = response.getJSONArray("filmes");
+                        if (movies.isEmpty()){
+                            moviesTable.setPlaceholder(new Label("Nenhum filme cadastrado no momento."));
+                        } else {
+                            for (int i = 0; i < movies.length(); i++) {
+                                movieList.add(Movie.fromJson(movies.getJSONObject(i)));
+                            }
+                        }
+                    } else {
+                        String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
+                        showErrorAlert(message);
+                        moviesTable.setPlaceholder(new Label(message));
                     }
-                } else {
-                    String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
-                    showErrorAlert(message);
+                } catch (Exception e) {
+                    showErrorAlert("Erro ao processar a resposta do servidor: " + e.getMessage());
+                    moviesTable.setPlaceholder(new Label("Erro ao processar dados."));
                 }
             });
         });
+
+        loadMoviesTask.setOnFailed(event -> Platform.runLater(() -> {
+            showErrorAlert("Falha na tarefa de carregar filmes.");
+            moviesTable.setPlaceholder(new Label("Falha ao carregar filmes."));
+        }));
 
         new Thread(loadMoviesTask).start();
     }
@@ -96,6 +118,13 @@ public class MovieManagementController {
     private void setupActionsColumn() {
         actionsColumn.setCellFactory(param -> new TableCell<>() {
             private final Button detailsButton = new Button("Ver Detalhes");
+
+            {
+                detailsButton.setOnAction(event -> {
+                    Movie movie = getTableView().getItems().get(getIndex());
+                    fetchAndShowDetails(String.valueOf(movie.getId()));
+                });
+            }
 
             @Override
             protected void updateItem(Void item, boolean empty) {
@@ -106,10 +135,6 @@ public class MovieManagementController {
                     HBox pane = new HBox(detailsButton);
                     pane.setAlignment(Pos.CENTER);
                     setGraphic(pane);
-                    detailsButton.setOnAction(event -> {
-                        Movie movie = getTableView().getItems().get(getIndex());
-                        fetchAndShowDetails(String.valueOf(movie.getId()));
-                    });
                 }
             }
         });
@@ -160,15 +185,26 @@ public class MovieManagementController {
 
         loadDetailsTask.setOnSucceeded(e -> {
             String responseJson = loadDetailsTask.getValue();
-            JSONObject response = new JSONObject(responseJson);
-            if ("200".equals(response.getString("status"))) {
-                Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
-                showDetailsWindow(detailedMovie);
-            } else {
-                String message = response.optString("mensagem", "Erro ao buscar detalhes do filme.");
-                showErrorAlert(message);
+            if (responseJson == null) {
+                showErrorAlert("Erro de comunicação ao buscar detalhes do filme.");
+                return;
+            }
+            try {
+                JSONObject response = new JSONObject(responseJson);
+                if ("200".equals(response.getString("status"))) {
+                    Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
+                    JSONArray reviewsArray = response.getJSONArray("reviews");
+                    showDetailsWindow(detailedMovie, reviewsArray);
+                } else {
+                    String message = response.optString("mensagem", "Erro ao buscar detalhes do filme.");
+                    showErrorAlert(message);
+                }
+            } catch(Exception ex) {
+                showErrorAlert("Erro ao processar detalhes do filme: " + ex.getMessage());
             }
         });
+
+        loadDetailsTask.setOnFailed(event -> Platform.runLater(() -> showErrorAlert("Falha na tarefa de buscar detalhes.")));
 
         new Thread(loadDetailsTask).start();
     }
@@ -176,10 +212,14 @@ public class MovieManagementController {
     @FXML
     private void handleSearchById() {
         String idText = searchIdField.getText().trim();
+        if (!idText.matches("\\d+")) {
+            showErrorAlert("Por favor, digite um ID numérico válido.");
+            return;
+        }
         fetchAndShowDetails(idText);
     }
 
-    private void showDetailsWindow(Movie movie) {
+    private void showDetailsWindow(Movie movie, JSONArray reviewsArray) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/MovieDetailView.fxml"));
             Stage stage = new Stage();
@@ -188,7 +228,7 @@ public class MovieManagementController {
             stage.setScene(new Scene(loader.load()));
 
             MovieDetailController controller = loader.getController();
-            controller.setMovie(movie);
+            controller.setMovieDetails(movie, reviewsArray);
 
             stage.showAndWait();
         } catch (IOException e) {
@@ -200,6 +240,7 @@ public class MovieManagementController {
     @FXML
     private void handleDeleteMovie() {
         Movie selectedMovie = moviesTable.getSelectionModel().getSelectedItem();
+        if (selectedMovie == null) return;
 
         Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
         confirmation.setTitle("Confirmar Exclusão");
@@ -217,31 +258,44 @@ public class MovieManagementController {
 
             deleteTask.setOnSucceeded(e -> {
                 String responseJson = deleteTask.getValue();
-                JSONObject response = new JSONObject(responseJson);
-                String status = response.getString("status");
-                if ("200".equals(status)) {
-                    Platform.runLater(() -> {
-                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                        alert.setTitle("Sucesso");
-                        alert.setHeaderText(null);
-                        alert.setContentText("Filme excluído com sucesso.");
-                        alert.showAndWait();
-                        loadMovies();
-                    });
-                } else {
-                    String finalMessage = response.optString("mensagem", "Erro ao excluir filme.");
-                    Platform.runLater(() -> showErrorAlert(finalMessage));
+                if (responseJson == null) {
+                    showErrorAlert("Erro de comunicação ao excluir filme.");
+                    return;
+                }
+                try {
+                    JSONObject response = new JSONObject(responseJson);
+                    String status = response.getString("status");
+                    if ("200".equals(status)) {
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Sucesso");
+                            alert.setHeaderText(null);
+                            alert.setContentText("Filme excluído com sucesso.");
+                            alert.showAndWait();
+                            loadMovies();
+                        });
+                    } else {
+                        String finalMessage = response.optString("mensagem", "Erro ao excluir filme.");
+                        Platform.runLater(() -> showErrorAlert(finalMessage));
+                    }
+                } catch (Exception ex) {
+                    Platform.runLater(() -> showErrorAlert("Erro ao processar resposta da exclusão: " + ex.getMessage()));
                 }
             });
+
+            deleteTask.setOnFailed(event -> Platform.runLater(() -> showErrorAlert("Falha na tarefa de excluir filme.")));
+
             new Thread(deleteTask).start();
         }
     }
 
     private void showErrorAlert(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Erro");
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Erro");
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
     }
 }

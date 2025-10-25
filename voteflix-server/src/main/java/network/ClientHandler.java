@@ -3,8 +3,10 @@ package network;
 import controller.ServerController;
 import dao.MovieDAO;
 import dao.UserDAO;
+import dao.ReviewDAO;
 import model.Movie;
 import model.User;
+import model.Review;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -26,6 +28,7 @@ public class ClientHandler implements Runnable {
     private final ServerController controller;
     private final UserDAO userDAO;
     private final MovieDAO movieDAO;
+    private final ReviewDAO reviewDAO;
     private final Server server;
     private PrintWriter out;
     private BufferedReader in;
@@ -51,6 +54,7 @@ public class ClientHandler implements Runnable {
         this.server = server;
         this.userDAO = new UserDAO();
         this.movieDAO = new MovieDAO();
+        this.reviewDAO = new ReviewDAO();
     }
 
     @Override
@@ -95,10 +99,26 @@ public class ClientHandler implements Runnable {
             if (token.isEmpty()) {
                 return createErrorResponse(401);
             }
+
+            Integer userIdFromToken = JwtUtil.getUserIdFromToken(token);
             String userFromToken = JwtUtil.getUsernameFromToken(token);
-            if (userFromToken == null) {
+            String roleFromToken = JwtUtil.getRoleFromToken(token);
+
+            if (userFromToken == null || userIdFromToken == null || roleFromToken == null) {
                 return createErrorResponse(401);
             }
+
+            try {
+                User currentUser = userDAO.findById(userIdFromToken);
+                if (currentUser == null) {
+                    needsToClose = true;
+                    return createErrorResponse(401, "Erro: Sua conta foi excluída ou não existe mais. Por favor, feche o programa e tente novamente.");
+                }
+            } catch (SQLException e) {
+                controller.log("Erro ao verificar existência do usuário: " + e.getMessage(), ServerController.LogType.ERROR);
+                return createErrorResponse(500);
+            }
+
 
             switch (operacao) {
                 case "LOGOUT":
@@ -113,9 +133,17 @@ public class ClientHandler implements Runnable {
                     return handleListMovies();
                 case "BUSCAR_FILME_ID":
                     return handleGetMovieById(request);
+                case "CRIAR_REVIEW":
+                    return handleCreateReview(request, userIdFromToken, userFromToken, roleFromToken);
+                case "LISTAR_REVIEWS_USUARIO":
+                    return handleListUserReviews(userIdFromToken);
+                case "EDITAR_REVIEW":
+                    return handleEditReview(request, userIdFromToken, roleFromToken);
+                case "EXCLUIR_REVIEW":
+                    return handleDeleteReview(request, userIdFromToken, roleFromToken);
             }
 
-            if (!"admin".equals(userFromToken)) {
+            if (!"admin".equals(roleFromToken)) {
                 return createErrorResponse(403);
             }
 
@@ -155,6 +183,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(401);
             }
         } catch (SQLException e) {
+            controller.log("Erro SQL no login: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException e) {
             return createErrorResponse(400);
@@ -181,7 +210,11 @@ public class ClientHandler implements Runnable {
             return createSuccessResponse("201").toString();
 
         } catch (SQLException e) {
-            return createErrorResponse(409);
+            if (e.getMessage().contains("UNIQUE constraint failed")) {
+                return createErrorResponse(409);
+            }
+            controller.log("Erro SQL ao criar usuário: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
         } catch (JSONException e) {
             return createErrorResponse(400);
         }
@@ -199,6 +232,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(404);
             }
         } catch (SQLException e) {
+            controller.log("Erro SQL ao atualizar própria senha: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException e) {
             return createErrorResponse(400);
@@ -218,6 +252,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(404);
             }
         } catch (SQLException e) {
+            controller.log("Erro SQL ao excluir próprio usuário: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         }
     }
@@ -238,7 +273,11 @@ public class ClientHandler implements Runnable {
             movieDAO.createMovie(movie);
             return createSuccessResponse("201").toString();
         } catch (SQLException e) {
-            return createErrorResponse(409);
+            if (e.getMessage().contains("UNIQUE constraint failed")) {
+                return createErrorResponse(409);
+            }
+            controller.log("Erro SQL ao criar filme: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
         } catch (JSONException e) {
             return createErrorResponse(400);
         }
@@ -247,7 +286,7 @@ public class ClientHandler implements Runnable {
     private String handleUpdateMovie(JSONObject request) {
         try {
             JSONObject movieJson = request.getJSONObject("filme");
-            if (isInvalidMovieFields(movieJson) || !movieJson.has("id")) {
+            if (!movieJson.has("id") || isInvalidMovieFields(movieJson)) {
                 return createErrorResponse(422);
             }
             Movie movie = movieFromJson(movieJson);
@@ -257,7 +296,11 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(404);
             }
         } catch (SQLException e) {
-            return createErrorResponse(409);
+            if (e.getMessage().contains("UNIQUE constraint failed")) {
+                return createErrorResponse(409);
+            }
+            controller.log("Erro SQL ao editar filme: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
         } catch (JSONException | NumberFormatException e) {
             return createErrorResponse(400);
         }
@@ -272,6 +315,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(404);
             }
         } catch (SQLException e) {
+            controller.log("Erro SQL ao excluir filme: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException | NumberFormatException e) {
             return createErrorResponse(400);
@@ -285,13 +329,20 @@ public class ClientHandler implements Runnable {
             if (movie == null) {
                 return createErrorResponse(404);
             }
+            List<Review> reviews = reviewDAO.findReviewsByMovieId(id);
+            JSONArray reviewsJson = new JSONArray();
+            for (Review review : reviews) {
+                reviewsJson.put(jsonFromReview(review));
+            }
+
             JSONObject response = createSuccessResponse("200");
             response.put("filme", jsonFromMovie(movie));
-            response.put("reviews", new JSONArray());
+            response.put("reviews", reviewsJson);
             return response.toString();
         } catch (NumberFormatException | JSONException e) {
             return createErrorResponse(400);
         } catch (SQLException e) {
+            controller.log("Erro SQL ao buscar filme por ID: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         }
     }
@@ -307,9 +358,131 @@ public class ClientHandler implements Runnable {
             response.put("filmes", moviesJson);
             return response.toString();
         } catch (SQLException e) {
+            controller.log("Erro SQL ao listar filmes: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         }
     }
+
+    private String handleCreateReview(JSONObject request, int userId, String username, String role) {
+        if (!"user".equals(role)) {
+            return createErrorResponse(403);
+        }
+        try {
+            JSONObject reviewJson = request.getJSONObject("review");
+            Review newReview = reviewFromJson(reviewJson);
+
+            if (newReview.getNota() < 1 || newReview.getNota() > 5 || (newReview.getDescricao() != null && newReview.getDescricao().length() > 250)) {
+                return createErrorResponse(422);
+            }
+
+            newReview.setIdUsuario(userId);
+            newReview.setNomeUsuario(username);
+
+            reviewDAO.createReview(newReview);
+            return createSuccessResponse("201").toString();
+
+        } catch (SQLException e) {
+            if (e.getMessage().contains("UNIQUE constraint failed")) {
+                return createErrorResponse(409, "Erro: Você já avaliou este filme.");
+            } else if (e.getMessage().contains("FOREIGN KEY constraint failed")) {
+                return createErrorResponse(404, "Erro: Filme não encontrado.");
+            }
+            controller.log("Erro SQL ao criar review: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleListUserReviews(int userId) {
+        try {
+            List<Review> reviews = reviewDAO.findReviewsByUserId(userId);
+            JSONArray reviewsJson = new JSONArray();
+            for (Review review : reviews) {
+                reviewsJson.put(jsonFromReview(review));
+            }
+            JSONObject response = createSuccessResponse("200");
+            response.put("reviews", reviewsJson);
+            return response.toString();
+        } catch (SQLException e) {
+            controller.log("Erro SQL ao listar reviews do usuário: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
+        }
+    }
+
+    private String handleEditReview(JSONObject request, int userId, String role) {
+        if (!"user".equals(role)) {
+            return createErrorResponse(403);
+        }
+        try {
+            JSONObject reviewJson = request.getJSONObject("review");
+
+            if (!reviewJson.has("id") || !reviewJson.has("nota")) {
+                return createErrorResponse(422);
+            }
+
+            int reviewId = Integer.parseInt(reviewJson.getString("id"));
+            int nota = Integer.parseInt(reviewJson.getString("nota"));
+            String titulo = reviewJson.optString("titulo", "");
+            String descricao = reviewJson.optString("descricao", "");
+
+
+            if (nota < 1 || nota > 5 || descricao.length() > 250) {
+                return createErrorResponse(422);
+            }
+
+            Review reviewToUpdate = reviewDAO.findByIdAndUserId(reviewId, userId);
+            if (reviewToUpdate == null) {
+                return createErrorResponse(404);
+            }
+
+
+            reviewToUpdate.setNota(nota);
+            reviewToUpdate.setTitulo(titulo);
+            reviewToUpdate.setDescricao(descricao);
+
+
+            if (reviewDAO.updateReview(reviewToUpdate)) {
+                return createSuccessResponse("200").toString();
+            } else {
+
+                return createErrorResponse(404);
+            }
+
+        } catch (SQLException e) {
+            controller.log("Erro SQL ao editar review: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
+    private String handleDeleteReview(JSONObject request, int userId, String role) {
+        try {
+            int reviewId = Integer.parseInt(request.getString("id"));
+            boolean success;
+
+            if ("admin".equals(role)) {
+                success = reviewDAO.deleteReviewAsAdmin(reviewId);
+            } else if ("user".equals(role)) {
+                success = reviewDAO.deleteReview(reviewId, userId);
+            } else {
+                return createErrorResponse(403);
+            }
+
+            if (success) {
+                return createSuccessResponse("200").toString();
+            } else {
+                return createErrorResponse(404);
+            }
+        } catch (SQLException e) {
+            controller.log("Erro SQL ao excluir review: " + e.getMessage(), ServerController.LogType.ERROR);
+            return createErrorResponse(500);
+        } catch (JSONException | NumberFormatException e) {
+            return createErrorResponse(400);
+        }
+    }
+
 
     private String handleListUsers() {
         try {
@@ -325,6 +498,7 @@ public class ClientHandler implements Runnable {
             response.put("usuarios", usersJson);
             return response.toString();
         } catch (SQLException e) {
+            controller.log("Erro SQL ao listar usuários: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         }
     }
@@ -333,15 +507,18 @@ public class ClientHandler implements Runnable {
         try {
             int userId = Integer.parseInt(request.getString("id"));
             String newPassword = request.getJSONObject("usuario").getString("senha");
-            if (isInvalidUserFields("tempuser", newPassword)) {
+
+            if (isInvalidUserFields("tempUsernameForValidation", newPassword)) {
                 return createErrorResponse(422);
             }
+
             if (userDAO.updateUserPasswordById(userId, newPassword)) {
                 return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
             }
         } catch (SQLException e) {
+            controller.log("Erro SQL ao admin editar usuário: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException | NumberFormatException e) {
             return createErrorResponse(400);
@@ -352,7 +529,8 @@ public class ClientHandler implements Runnable {
         try {
             int userId = Integer.parseInt(request.getString("id"));
 
-            if (userId == 1) {
+            User userToDelete = userDAO.findById(userId);
+            if (userToDelete != null && "admin".equalsIgnoreCase(userToDelete.getNome())) {
                 return createErrorResponse(403);
             }
 
@@ -362,6 +540,7 @@ public class ClientHandler implements Runnable {
                 return createErrorResponse(404);
             }
         } catch (SQLException e) {
+            controller.log("Erro SQL ao admin excluir usuário: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException | NumberFormatException e) {
             return createErrorResponse(400);
@@ -374,21 +553,28 @@ public class ClientHandler implements Runnable {
     }
 
     private boolean isInvalidUserFields(String username, String password) {
-        return username.length() < 3 || username.length() > 20 || !username.matches("[a-zA-Z0-9]+") ||
-                password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
+        return username == null || username.length() < 3 || username.length() > 20 || !username.matches("[a-zA-Z0-9]+") ||
+                password == null || password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
     }
 
     private boolean isInvalidMovieFields(JSONObject movieJson) {
-        return movieJson.optString("titulo").length() > 30 || movieJson.optString("titulo").isEmpty() ||
-                !movieJson.optString("ano").matches("\\d{4}") ||
-                movieJson.optString("sinopse").length() > 250 ||
-                movieJson.optString("diretor").isEmpty() ||
-                movieJson.optJSONArray("genero") == null || movieJson.optJSONArray("genero").isEmpty();
+        if (movieJson == null) return true;
+        String titulo = movieJson.optString("titulo");
+        String ano = movieJson.optString("ano");
+        String sinopse = movieJson.optString("sinopse");
+        String diretor = movieJson.optString("diretor");
+        JSONArray genero = movieJson.optJSONArray("genero");
+
+        return titulo.isEmpty() || titulo.length() > 30 ||
+                !ano.matches("\\d{4}") ||
+                sinopse.length() > 250 ||
+                diretor.isEmpty() ||
+                genero == null || genero.isEmpty();
     }
 
-    private Movie movieFromJson(JSONObject json) {
+    private Movie movieFromJson(JSONObject json) throws JSONException{
         Movie movie = new Movie();
-        if (json.has("id")) movie.setId(Integer.parseInt(json.getString("id")));
+        movie.setId(Integer.parseInt(json.getString("id")));
         movie.setTitulo(json.getString("titulo"));
         movie.setDiretor(json.getString("diretor"));
         movie.setAno(json.getString("ano"));
@@ -403,6 +589,16 @@ public class ClientHandler implements Runnable {
         return movie;
     }
 
+    private Review reviewFromJson(JSONObject json) throws JSONException {
+        Review review = new Review();
+        review.setIdFilme(Integer.parseInt(json.getString("id_filme")));
+        review.setNota(Integer.parseInt(json.getString("nota")));
+        review.setTitulo(json.optString("titulo"));
+        review.setDescricao(json.optString("descricao"));
+        review.setId(json.optInt("id"));
+        return review;
+    }
+
     private JSONObject jsonFromMovie(Movie movie) {
         JSONObject movieJson = new JSONObject();
         movieJson.put("id", String.valueOf(movie.getId()));
@@ -411,10 +607,31 @@ public class ClientHandler implements Runnable {
         movieJson.put("ano", movie.getAno());
         movieJson.put("genero", new JSONArray(movie.getGeneros()));
         movieJson.put("sinopse", movie.getSinopse());
-        movieJson.put("nota", String.format("%.1f", movie.getNota()));
+        movieJson.put("nota", String.format("%.1f", movie.getNota()).replace(",","."));
         movieJson.put("qtd_avaliacoes", String.valueOf(movie.getQtdAvaliacoes()));
         return movieJson;
     }
+
+    private JSONObject jsonFromReview(Review review) {
+        JSONObject reviewJson = new JSONObject();
+        reviewJson.put("id", String.valueOf(review.getId()));
+        reviewJson.put("id_filme", String.valueOf(review.getIdFilme()));
+        reviewJson.put("nome_usuario", review.getNomeUsuario());
+        reviewJson.put("nota", String.valueOf(review.getNota()));
+        reviewJson.put("titulo", review.getTitulo() != null ? review.getTitulo() : "");
+        reviewJson.put("descricao", review.getDescricao() != null ? review.getDescricao() : "");
+        reviewJson.put("data", review.getData() != null ? review.getData() : "");
+        return reviewJson;
+    }
+
+
+    private String createErrorResponse(int status, String customMessage) {
+        JSONObject errorResponse = new JSONObject();
+        errorResponse.put("status", String.valueOf(status));
+        errorResponse.put("mensagem", customMessage);
+        return errorResponse.toString();
+    }
+
 
     private String createErrorResponse(int status) {
         String statusCode = String.valueOf(status);
@@ -444,8 +661,8 @@ public class ClientHandler implements Runnable {
         }
     }
     public String getIdentifier() {
-        return username != null ? username : clientSocket.getInetAddress().toString();
+        return username != null ? username : (clientSocket != null ? clientSocket.getInetAddress().toString() : "Cliente desconectado");
     }
     public String getUsername() { return username; }
-    public String getClientIpAddress() { return clientSocket.getInetAddress().getHostAddress(); }
+    public String getClientIpAddress() { return clientSocket != null ? clientSocket.getInetAddress().getHostAddress() : "N/A"; }
 }

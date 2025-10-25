@@ -10,6 +10,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -52,6 +53,7 @@ public class UserMovieController {
         ratingColumn.setCellValueFactory(new PropertyValueFactory<>("nota"));
         setupActionsColumn();
         moviesTable.setItems(movieList);
+        moviesTable.setPlaceholder(new Label("Carregando filmes..."));
     }
 
     public void loadMovies() {
@@ -67,21 +69,38 @@ public class UserMovieController {
             String responseJson = loadMoviesTask.getValue();
             Platform.runLater(() -> {
                 movieList.clear();
-                JSONObject response = new JSONObject(responseJson);
-                if ("200".equals(response.getString("status"))) {
-                    JSONArray movies = response.getJSONArray("filmes");
-                    if (movies.isEmpty()){
-                        moviesTable.setPlaceholder(new javafx.scene.control.Label("Nenhum filme cadastrado no momento."));
+                if (responseJson == null) {
+                    showErrorAlert("Erro de comunicação ao carregar filmes.");
+                    moviesTable.setPlaceholder(new Label("Erro ao carregar filmes."));
+                    return;
+                }
+                try {
+                    JSONObject response = new JSONObject(responseJson);
+                    if ("200".equals(response.getString("status"))) {
+                        JSONArray movies = response.getJSONArray("filmes");
+                        if (movies.isEmpty()){
+                            moviesTable.setPlaceholder(new Label("Nenhum filme cadastrado no momento."));
+                        } else {
+                            for (int i = 0; i < movies.length(); i++) {
+                                movieList.add(Movie.fromJson(movies.getJSONObject(i)));
+                            }
+                        }
+                    } else {
+                        String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
+                        showErrorAlert(message);
+                        moviesTable.setPlaceholder(new Label(message));
                     }
-                    for (int i = 0; i < movies.length(); i++) {
-                        movieList.add(Movie.fromJson(movies.getJSONObject(i)));
-                    }
-                } else {
-                    String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
-                    showErrorAlert(message);
+                } catch (Exception e) {
+                    showErrorAlert("Erro ao processar a resposta do servidor: " + e.getMessage());
+                    moviesTable.setPlaceholder(new Label("Erro ao processar dados."));
                 }
             });
         });
+
+        loadMoviesTask.setOnFailed(event -> Platform.runLater(() -> {
+            showErrorAlert("Falha na tarefa de carregar filmes.");
+            moviesTable.setPlaceholder(new Label("Falha ao carregar filmes."));
+        }));
 
         new Thread(loadMoviesTask).start();
     }
@@ -89,6 +108,14 @@ public class UserMovieController {
     private void setupActionsColumn() {
         actionsColumn.setCellFactory(param -> new TableCell<>() {
             private final Button detailsButton = new Button("Ver Detalhes");
+
+            {
+                detailsButton.setOnAction(event -> {
+                    Movie movie = getTableView().getItems().get(getIndex());
+                    fetchAndShowDetails(String.valueOf(movie.getId()));
+                });
+            }
+
 
             @Override
             protected void updateItem(Void item, boolean empty) {
@@ -99,50 +126,59 @@ public class UserMovieController {
                     HBox pane = new HBox(detailsButton);
                     pane.setAlignment(Pos.CENTER);
                     setGraphic(pane);
-                    detailsButton.setOnAction(event -> {
-                        Movie movie = getTableView().getItems().get(getIndex());
-                        handleViewDetails(movie);
-                    });
                 }
             }
         });
     }
 
-    private void handleViewDetails(Movie movie) {
-        if (movie == null) return;
-        showDetailsWindow(movie);
-    }
-
     @FXML
     private void handleSearchById() {
         String idText = searchIdField.getText().trim();
+        fetchAndShowDetails(idText);
+    }
+
+    private void fetchAndShowDetails(String movieId) {
+        if (movieId == null || movieId.isEmpty()) return;
 
         Task<String> loadDetailsTask = new Task<>() {
             @Override
             protected String call() {
                 String token = SessionManager.getInstance().getToken();
-                return ServerConnection.getInstance().getMovieById(token, idText);
+                return ServerConnection.getInstance().getMovieById(token, movieId);
             }
         };
 
         loadDetailsTask.setOnSucceeded(e -> {
             String responseJson = loadDetailsTask.getValue();
-            JSONObject response = new JSONObject(responseJson);
-            String status = response.getString("status");
+            if (responseJson == null) {
+                showErrorAlert("Erro de comunicação ao buscar detalhes do filme.");
+                return;
+            }
+            try {
+                JSONObject response = new JSONObject(responseJson);
+                String status = response.getString("status");
 
-            if ("200".equals(status)) {
-                Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
-                showDetailsWindow(detailedMovie);
-            } else {
-                String message = response.optString("mensagem", "Erro ao buscar filme por ID.");
-                showErrorAlert(message);
+                if ("200".equals(status)) {
+                    Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
+                    JSONArray reviewsArray = response.getJSONArray("reviews");
+                    showDetailsWindow(detailedMovie, reviewsArray);
+                } else {
+                    String message = response.optString("mensagem", "Erro ao buscar detalhes do filme.");
+                    showErrorAlert(message);
+                }
+            } catch(Exception ex) {
+                showErrorAlert("Erro ao processar detalhes do filme: " + ex.getMessage());
             }
         });
+
+        loadDetailsTask.setOnFailed(event -> Platform.runLater(() -> showErrorAlert("Falha na tarefa de buscar detalhes.")));
+
 
         new Thread(loadDetailsTask).start();
     }
 
-    private void showDetailsWindow(Movie movie) {
+
+    private void showDetailsWindow(Movie movie, JSONArray reviewsArray) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/MovieDetailView.fxml"));
             Stage stage = new Stage();
@@ -151,7 +187,7 @@ public class UserMovieController {
             stage.setScene(new Scene(loader.load()));
 
             MovieDetailController controller = loader.getController();
-            controller.setMovie(movie);
+            controller.setMovieDetails(movie, reviewsArray);
 
             stage.showAndWait();
         } catch (IOException e) {
@@ -161,10 +197,12 @@ public class UserMovieController {
     }
 
     private void showErrorAlert(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Erro");
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Erro");
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
     }
 }

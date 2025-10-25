@@ -113,7 +113,6 @@ public class ServerConnection {
         request.put("operacao", "LOGOUT");
         request.put("token", token);
         sendRequestAndGetResponse(request.toString());
-        disconnect();
     }
 
     public String updateOwnPassword(String newPassword, String token) {
@@ -130,8 +129,20 @@ public class ServerConnection {
         JSONObject request = new JSONObject();
         request.put("operacao", "EXCLUIR_PROPRIO_USUARIO");
         request.put("token", token);
-        sendRequestAndGetResponse(request.toString());
-        disconnect();
+        String response = sendRequestAndGetResponse(request.toString());
+        if (response != null) {
+            try {
+                JSONObject jsonResponse = new JSONObject(response);
+                if ("200".equals(jsonResponse.optString("status"))) {
+                    disconnect();
+                }
+            } catch (Exception e) {
+                log("Erro ao processar resposta de deleteOwnUser: " + e.getMessage());
+                disconnect();
+            }
+        } else {
+            disconnect();
+        }
     }
 
     public String listOwnUser(String token) {
@@ -221,6 +232,50 @@ public class ServerConnection {
         request.put("token", token);
         return sendRequestAndGetResponse(request.toString());
     }
+
+    public String createReview(String token, String movieId, int nota, String titulo, String descricao) {
+        JSONObject review = new JSONObject();
+        review.put("id_filme", movieId);
+        review.put("nota", String.valueOf(nota));
+        review.put("titulo", titulo);
+        review.put("descricao", descricao);
+
+        JSONObject request = new JSONObject();
+        request.put("operacao", "CRIAR_REVIEW");
+        request.put("review", review);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String listUserReviews(String token) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "LISTAR_REVIEWS_USUARIO");
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String editReview(String token, String reviewId, int nota, String titulo, String descricao) {
+        JSONObject review = new JSONObject();
+        review.put("id", reviewId);
+        review.put("nota", String.valueOf(nota));
+        review.put("titulo", titulo);
+        review.put("descricao", descricao);
+
+        JSONObject request = new JSONObject();
+        request.put("operacao", "EDITAR_REVIEW");
+        request.put("review", review);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
+    public String deleteReview(String token, String reviewId) {
+        JSONObject request = new JSONObject();
+        request.put("operacao", "EXCLUIR_REVIEW");
+        request.put("id", reviewId);
+        request.put("token", token);
+        return sendRequestAndGetResponse(request.toString());
+    }
+
 
     private String createErrorResponse(String message) {
         JSONObject errorResponse = new JSONObject();

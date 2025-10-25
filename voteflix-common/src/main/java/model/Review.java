@@ -6,6 +6,7 @@ public class Review implements Serializable {
 
     private int id;
     private int idFilme;
+    private int idUsuario;
     private String nomeUsuario;
     private String titulo;
     private String descricao;
@@ -29,6 +30,14 @@ public class Review implements Serializable {
 
     public void setIdFilme(int idFilme) {
         this.idFilme = idFilme;
+    }
+
+    public int getIdUsuario() {
+        return idUsuario;
+    }
+
+    public void setIdUsuario(int idUsuario) {
+        this.idUsuario = idUsuario;
     }
 
     public String getNomeUsuario() {
