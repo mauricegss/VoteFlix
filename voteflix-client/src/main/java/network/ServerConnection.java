@@ -113,6 +113,7 @@ public class ServerConnection {
         request.put("operacao", "LOGOUT");
         request.put("token", token);
         sendRequestAndGetResponse(request.toString());
+        disconnect();
     }
 
     public String updateOwnPassword(String newPassword, String token) {

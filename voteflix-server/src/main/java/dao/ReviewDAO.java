@@ -16,13 +16,12 @@ public class ReviewDAO {
         String sql = "INSERT INTO reviews(id_filme, id_usuario, nome_usuario, nota, titulo, descricao, data) VALUES(?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement pstmt = null;
-        ResultSet generatedKeys = null;
         String currentDateStr = LocalDate.now().format(DATE_FORMATTER);
         try {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, review.getIdFilme());
             pstmt.setInt(2, review.getIdUsuario());
             pstmt.setString(3, review.getNomeUsuario());
@@ -37,12 +36,17 @@ public class ReviewDAO {
                 throw new SQLException("Falha ao criar review, nenhuma linha afetada.");
             }
 
-            generatedKeys = pstmt.getGeneratedKeys();
-            if (generatedKeys.next()) {
-                review.setId(generatedKeys.getInt(1));
-                review.setData(currentDateStr);
-            } else {
-                System.err.println("Aviso: Não foi possível obter o ID gerado para a nova review.");
+            try (Statement stmt = conn.createStatement();
+                 ResultSet generatedKeys = stmt.executeQuery("SELECT last_insert_rowid()")) {
+
+                if (generatedKeys.next()) {
+                    review.setId(generatedKeys.getInt(1));
+                    review.setData(currentDateStr);
+                } else {
+                    System.err.println("Aviso: Não foi possível obter o ID gerado para a nova review.");
+                    conn.rollback();
+                    throw new SQLException("Falha ao obter o ID da review após a inserção.");
+                }
             }
 
             updateMovieRating(conn, review.getIdFilme());
@@ -53,7 +57,6 @@ public class ReviewDAO {
             if (conn != null) try { conn.rollback(); } catch (SQLException ex) { System.err.println("Erro ao reverter transação em createReview: " + ex.getMessage()); }
             throw e;
         } finally {
-            if (generatedKeys != null) try { generatedKeys.close(); } catch (SQLException e) { /* ignore */ }
             if (pstmt != null) try { pstmt.close(); } catch (SQLException e) { /* ignore */ }
             if (conn != null) {
                 try {
@@ -272,7 +275,6 @@ public class ReviewDAO {
         }
         return success;
     }
-
 
     private void updateMovieRating(Connection conn, int movieId) throws SQLException {
         String sqlAvg = "SELECT AVG(CAST(nota AS REAL)), COUNT(id) FROM reviews WHERE id_filme = ?";

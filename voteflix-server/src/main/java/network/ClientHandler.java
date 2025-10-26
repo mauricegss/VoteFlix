@@ -574,7 +574,7 @@ public class ClientHandler implements Runnable {
 
     private Movie movieFromJson(JSONObject json) throws JSONException{
         Movie movie = new Movie();
-        movie.setId(Integer.parseInt(json.getString("id")));
+        movie.setId(json.optInt("id"));
         movie.setTitulo(json.getString("titulo"));
         movie.setDiretor(json.getString("diretor"));
         movie.setAno(json.getString("ano"));
