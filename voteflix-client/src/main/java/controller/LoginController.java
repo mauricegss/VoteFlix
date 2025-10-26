@@ -14,6 +14,7 @@ import session.SessionManager;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Objects;
 
 public class LoginController {
 
@@ -111,7 +112,9 @@ public class LoginController {
 
             Stage stage = new Stage();
             stage.setTitle("VoteFlix");
-            stage.setScene(new Scene(loader.load()));
+            Scene scene = new Scene(loader.load());
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+            stage.setScene(scene);
             stage.show();
         } catch (IOException e) {
             System.err.println("Erro ao carregar FXML da tela principal: " + e.getMessage());

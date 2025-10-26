@@ -21,6 +21,7 @@ public class MainController {
     @FXML private TabPane mainTabPane;
     @FXML private Tab profileTab;
     @FXML private Tab moviesTab;
+    @FXML private Tab myReviewsTab;
     @FXML private Tab userManagementTab;
 
     @FXML
@@ -43,11 +44,18 @@ public class MainController {
                     if (userManagementTab.isSelected() && userController != null) userController.loadUsers();
                 });
 
+                mainTabPane.getTabs().remove(myReviewsTab);
+
             } else {
                 moviesTab.setText("Ver Filmes");
                 UserMovieController movieController = (UserMovieController) getControllerForTab(moviesTab, "/view/UserMovieView.fxml");
                 moviesTab.setOnSelectionChanged(event -> {
                     if (moviesTab.isSelected() && movieController != null) movieController.loadMovies();
+                });
+
+                MyReviewsController reviewsController = (MyReviewsController) getControllerForTab(myReviewsTab, "/view/MyReviewsView.fxml");
+                myReviewsTab.setOnSelectionChanged(event -> {
+                    if (myReviewsTab.isSelected() && reviewsController != null) reviewsController.loadAndShowReviews();
                 });
 
                 mainTabPane.getTabs().remove(userManagementTab);
@@ -83,7 +91,9 @@ public class MainController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/ConnectionView.fxml"));
             Stage stage = new Stage();
             stage.setTitle("VoteFlix Client - Conexão");
-            stage.setScene(new Scene(loader.load(), 300, 250));
+            Scene scene = new Scene(loader.load(), 350, 350);
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+            stage.setScene(scene);
             stage.show();
 
         } catch (IOException e) {
@@ -97,6 +107,8 @@ public class MainController {
         alert.setTitle("Erro Crítico");
         alert.setHeaderText(null);
         alert.setContentText("Não foi possível carregar as telas principais. Verifique os arquivos FXML.");
+        alert.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+        alert.getDialogPane().getStyleClass().add("root");
         alert.showAndWait();
     }
 }

@@ -36,6 +36,10 @@ public class UserManagementController {
     private void initialize() {
         idColumn.setCellValueFactory(new PropertyValueFactory<>("id"));
         nameColumn.setCellValueFactory(new PropertyValueFactory<>("nome"));
+
+        idColumn.getStyleClass().add("id-column");
+        actionsColumn.getStyleClass().add("actions-column");
+
         setupActionsColumn();
         usersTable.setItems(userList);
     }
@@ -76,6 +80,8 @@ public class UserManagementController {
             private final HBox pane = new HBox(10, updateBtn, deleteBtn);
 
             {
+                deleteBtn.getStyleClass().add("delete-button");
+
                 pane.setAlignment(Pos.CENTER);
                 updateBtn.setOnAction(event -> {
                     User user = getTableView().getItems().get(getIndex());

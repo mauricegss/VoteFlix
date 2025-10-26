@@ -9,27 +9,17 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 
 <BorderPane prefHeight="600.0" prefWidth="800.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.UserMovieController">
     <top>
-        <VBox>
+        <VBox spacing="10.0">
+            <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+            </padding>
+            <Label text="Filmes Disponíveis" styleClass="title-label" />
             <HBox alignment="CENTER_LEFT" spacing="10.0">
-                <padding>
-                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-                </padding>
-                <Label text="Filmes Disponíveis">
-                    <font>
-                        <Font name="System Bold" size="18.0"/>
-                    </font>
-                </Label>
-            </HBox>
-            <HBox alignment="CENTER_LEFT" spacing="10.0">
-                <padding>
-                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
-                </padding>
                 <Label text="Buscar Filme por ID:"/>
-                <TextField fx:id="searchIdField" promptText="Digite o ID do filme"/>
+                <TextField fx:id="searchIdField" promptText="Digite o ID do filme" HBox.hgrow="ALWAYS" />
                 <Button onAction="#handleSearchById" text="Buscar"/>
             </HBox>
         </VBox>
@@ -37,14 +27,13 @@
     <center>
         <TableView fx:id="moviesTable" prefHeight="200.0" prefWidth="200.0" BorderPane.alignment="CENTER">
             <columns>
-                <TableColumn fx:id="idColumn" prefWidth="50.0" text="ID" />
-                <TableColumn fx:id="titleColumn" prefWidth="150.0" text="Título" />
-                <TableColumn fx:id="directorColumn" prefWidth="120.0" text="Diretor" />
-                <TableColumn fx:id="yearColumn" prefWidth="60.0" text="Ano" />
-                <TableColumn fx:id="genresColumn" prefWidth="120.0" text="Gêneros" />
-                <TableColumn fx:id="synopsisColumn" prefWidth="250.0" text="Sinopse" />
-                <TableColumn fx:id="ratingColumn" text="Nota" />
-                <TableColumn fx:id="actionsColumn" prefWidth="100.0" text="Ações" />
+                <TableColumn fx:id="idColumn" prefWidth="50.0" text="ID" styleClass="id-column" />
+                <TableColumn fx:id="titleColumn" prefWidth="180.0" text="Título" />
+                <TableColumn fx:id="directorColumn" prefWidth="150.0" text="Diretor" />
+                <TableColumn fx:id="yearColumn" prefWidth="60.0" text="Ano" styleClass="id-column" />
+                <TableColumn fx:id="genresColumn" prefWidth="150.0" text="Gêneros" />
+                <TableColumn fx:id="ratingColumn" prefWidth="70.0" text="Nota" styleClass="rating-column" />
+                <TableColumn fx:id="actionsColumn" prefWidth="120.0" text="Ações" styleClass="actions-column" />
             </columns>
             <columnResizePolicy>
                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />

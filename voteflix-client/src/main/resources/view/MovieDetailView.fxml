@@ -6,32 +6,20 @@
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 <?import javafx.scene.text.Text?>
 <?import javafx.scene.text.TextFlow?>
 
-<VBox prefWidth="450.0" spacing="10.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.MovieDetailController">
+<VBox prefWidth="550.0" spacing="10.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.MovieDetailController">
     <padding>
         <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
     </padding>
-    <Label fx:id="titleLabel" text="Título do Filme" wrapText="true">
-        <font>
-            <Font name="System Bold" size="24.0" />
-        </font>
-    </Label>
-    <Label fx:id="directorAndYearLabel" text="Diretor (Ano)" />
+    <Label fx:id="titleLabel" text="Título do Filme" wrapText="true" styleClass="title-label" />
+    <Label fx:id="directorAndYearLabel" text="Diretor (Ano)" style="-fx-font-style: italic;" />
     <Label fx:id="genresLabel" text="Gêneros" wrapText="true" />
-    <Label fx:id="ratingLabel" text="Nota: X/5.0 (Y avaliações)">
-        <font>
-            <Font name="System Bold" size="12.0" />
-        </font>
-    </Label>
-    <Label text="Sinopse:">
-        <font>
-            <Font name="System Bold" size="12.0" />
-        </font>
+    <Label fx:id="ratingLabel" text="Nota: X/5.0 (Y avaliações)" style="-fx-font-weight: bold; -fx-font-size: 13px;" />
+
+    <Label text="Sinopse:" styleClass="header-label">
         <VBox.margin>
             <Insets top="10.0" />
         </VBox.margin>
@@ -39,22 +27,20 @@
     <TextFlow>
         <Text fx:id="synopsisText" text="Sinopse do filme vai aqui..." />
     </TextFlow>
+
     <HBox fx:id="reviewActionBox" alignment="CENTER_RIGHT" managed="false" visible="false">
         <VBox.margin>
             <Insets top="10.0" />
         </VBox.margin>
         <Button fx:id="addEditReviewButton" mnemonicParsing="false" onAction="#handleAddEditReview" text="Adicionar Avaliação" />
     </HBox>
+
     <Separator prefWidth="200.0">
         <VBox.margin>
             <Insets bottom="5.0" top="15.0" />
         </VBox.margin>
     </Separator>
-    <Label text="Avaliações:">
-        <font>
-            <Font name="System Bold" size="14.0" />
-        </font>
-    </Label>
+    <Label text="Avaliações:" styleClass="header-label" />
     <ListView fx:id="reviewsListView" prefHeight="200.0" VBox.vgrow="ALWAYS" />
     <Label fx:id="statusLabel" textFill="RED" wrapText="true" />
 </VBox>

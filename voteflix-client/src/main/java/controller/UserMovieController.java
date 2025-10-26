@@ -26,6 +26,7 @@ import org.json.JSONObject;
 import session.SessionManager;
 
 import java.io.IOException;
+import java.util.Objects;
 
 public class UserMovieController {
 
@@ -35,7 +36,6 @@ public class UserMovieController {
     @FXML private TableColumn<Movie, String> directorColumn;
     @FXML private TableColumn<Movie, String> yearColumn;
     @FXML private TableColumn<Movie, String> genresColumn;
-    @FXML private TableColumn<Movie, String> synopsisColumn;
     @FXML private TableColumn<Movie, Double> ratingColumn;
     @FXML private TableColumn<Movie, Void> actionsColumn;
     @FXML private TextField searchIdField;
@@ -49,7 +49,6 @@ public class UserMovieController {
         directorColumn.setCellValueFactory(new PropertyValueFactory<>("diretor"));
         yearColumn.setCellValueFactory(new PropertyValueFactory<>("ano"));
         genresColumn.setCellValueFactory(new PropertyValueFactory<>("generosString"));
-        synopsisColumn.setCellValueFactory(new PropertyValueFactory<>("sinopse"));
         ratingColumn.setCellValueFactory(new PropertyValueFactory<>("nota"));
         setupActionsColumn();
         moviesTable.setItems(movieList);
@@ -110,6 +109,8 @@ public class UserMovieController {
             private final Button detailsButton = new Button("Ver Detalhes");
 
             {
+                detailsButton.setStyle("-fx-padding: 5px 10px;");
+
                 detailsButton.setOnAction(event -> {
                     Movie movie = getTableView().getItems().get(getIndex());
                     fetchAndShowDetails(String.valueOf(movie.getId()));
@@ -184,7 +185,9 @@ public class UserMovieController {
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setTitle("Detalhes do Filme");
-            stage.setScene(new Scene(loader.load()));
+            Scene scene = new Scene(loader.load());
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+            stage.setScene(scene);
 
             MovieDetailController controller = loader.getController();
             controller.setMovieDetails(movie, reviewsArray);
@@ -202,6 +205,8 @@ public class UserMovieController {
             alert.setTitle("Erro");
             alert.setHeaderText(null);
             alert.setContentText(message);
+            alert.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+            alert.getDialogPane().getStyleClass().add("root");
             alert.showAndWait();
         });
     }

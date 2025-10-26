@@ -12,6 +12,7 @@ import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import network.ServerConnection;
 import java.io.IOException;
+import java.util.Objects;
 
 public class ConnectionController {
 
@@ -80,7 +81,9 @@ public class ConnectionController {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/LoginView.fxml"));
         Stage stage = new Stage();
         stage.setTitle("Login / Cadastro");
-        stage.setScene(new Scene(loader.load()));
+        Scene scene = new Scene(loader.load());
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+        stage.setScene(scene);
         stage.show();
     }
 

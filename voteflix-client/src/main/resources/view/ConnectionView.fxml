@@ -5,20 +5,20 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" prefHeight="250.0" prefWidth="300.0" spacing="15.0" xmlns="http://javafx.com/javafx/21"
+<VBox alignment="CENTER" prefHeight="350.0" prefWidth="350.0" spacing="15.0" xmlns="http://javafx.com/javafx/21"
       xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.ConnectionController">
     <padding>
-        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+        <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
     </padding>
-    <Label text="Conectar ao Servidor">
-        <font>
-            <Font name="System Bold" size="18.0"/>
-        </font>
+    <Label text="VOTEFLIX" styleClass="brand-title">
+        <VBox.margin>
+            <Insets bottom="10.0" />
+        </VBox.margin>
     </Label>
-    <TextField fx:id="ipField" maxWidth="200.0" promptText="Endereço IP" text="10.20.8.1"/>
-    <TextField fx:id="portField" maxWidth="200.0" promptText="Porta" text="22222"/>
-    <Button fx:id="connectButton" onAction="#handleConnectButton" text="Conectar"/>
-    <Label fx:id="statusLabel" textFill="RED"/>
+    <Label text="Conectar ao Servidor" styleClass="header-label"/>
+    <TextField fx:id="ipField" maxWidth="250.0" promptText="Endereço IP" text="127.0.0.1"/>
+    <TextField fx:id="portField" maxWidth="250.0" promptText="Porta" text="22222"/>
+    <Button fx:id="connectButton" onAction="#handleConnectButton" text="Conectar" defaultButton="true"/>
+    <Label fx:id="statusLabel" styleClass="status-label"/>
 </VBox>

@@ -26,6 +26,7 @@ import session.SessionManager;
 import util.TokenDecoder;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Optional;
 
 public class MovieDetailController {
@@ -43,15 +44,18 @@ public class MovieDetailController {
     private Movie currentMovie;
     private final ObservableList<Review> currentReviews = FXCollections.observableArrayList();
     private Review userExistingReview = null;
-    private String currentUserRole; // Restaurado como campo da classe
-    private Integer currentUserId;  // Restaurado como campo da classe
+    private String currentUserRole;
+    private Integer currentUserId;
 
 
     @FXML
     private void initialize() {
         String token = SessionManager.getInstance().getToken();
         currentUserRole = TokenDecoder.getRoleFromToken(token);
-        currentUserId = TokenDecoder.getUserIdFromToken(token); // Obtém o ID aqui
+        currentUserId = TokenDecoder.getUserIdFromToken(token);
+
+        synopsisText.getStyleClass().add("synopsis-text");
+        synopsisText.setStyle("-fx-fill: #E0E0E0;");
 
         setupReviewListViewCellFactory();
         reviewsListView.setItems(currentReviews);
@@ -83,14 +87,12 @@ public class MovieDetailController {
                     JSONObject reviewJson = reviewsArray.getJSONObject(i);
                     Review review = parseReviewFromJson(reviewJson);
                     currentReviews.add(review);
-                    // Usa o currentUserId (campo da classe) que foi inicializado
                     if (currentUserId != null && review.getIdUsuario() == currentUserId) {
                         userExistingReview = review;
                     }
                 }
             }
 
-            // Usa o currentUserRole (campo da classe)
             if ("user".equals(currentUserRole)) {
                 addEditReviewButton.setText(userExistingReview != null ? "Editar Minha Avaliação" : "Adicionar Avaliação");
             }
@@ -135,6 +137,11 @@ public class MovieDetailController {
                 reviewTextLabel.setWrapText(true);
                 reviewContent.getChildren().add(reviewTextLabel);
                 HBox.setHgrow(spacer, Priority.ALWAYS);
+
+                editButton.setStyle("-fx-padding: 3px 8px;");
+                deleteButton.setStyle("-fx-padding: 3px 8px;");
+                deleteButton.getStyleClass().add("delete-button");
+
                 hbox.getChildren().addAll(reviewContent, spacer, editButton, deleteButton);
                 hbox.setAlignment(Pos.CENTER_LEFT);
                 hbox.setPadding(new Insets(5, 5, 5, 5));
@@ -163,14 +170,13 @@ public class MovieDetailController {
                 } else {
                     String reviewDisplay = String.format("[%d★] %s (%s - %s)\n%s",
                             review.getNota(),
-                            review.getTitulo().isEmpty() ? "Avaliação" : review.getTitulo(),
+                            review.getTitulo().isEmpty() ? "(Sem Título)" : review.getTitulo(),
                             review.getNomeUsuario(),
                             review.getData(),
                             review.getDescricao()
                     );
                     reviewTextLabel.setText(reviewDisplay);
 
-                    // Usa os campos da classe currentUserRole e currentUserId
                     boolean canEdit = "user".equals(currentUserRole) && currentUserId != null && review.getIdUsuario() == currentUserId;
                     boolean canDelete = canEdit || "admin".equals(currentUserRole);
 
@@ -196,7 +202,9 @@ public class MovieDetailController {
             Stage stage = new Stage();
             stage.initModality(Modality.APPLICATION_MODAL);
             stage.setTitle(reviewToEdit != null ? "Editar Avaliação" : "Adicionar Avaliação");
-            stage.setScene(new Scene(loader.load()));
+            Scene scene = new Scene(loader.load());
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+            stage.setScene(scene);
 
             ReviewFormController controller = loader.getController();
             controller.setDialogStage(stage);
@@ -217,6 +225,8 @@ public class MovieDetailController {
         confirmation.setTitle("Confirmar Exclusão");
         confirmation.setHeaderText("Tem certeza que deseja excluir esta avaliação?");
         confirmation.setContentText("Avaliação de: " + review.getNomeUsuario());
+        confirmation.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+        confirmation.getDialogPane().getStyleClass().add("root");
 
         Optional<ButtonType> result = confirmation.showAndWait();
         if (result.isPresent() && result.get() == ButtonType.OK) {
@@ -240,11 +250,7 @@ public class MovieDetailController {
                     JSONObject response = new JSONObject(responseJson);
                     String status = response.getString("status");
                     if ("200".equals(status)) {
-                        Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                        successAlert.setTitle("Sucesso");
-                        successAlert.setHeaderText(null);
-                        successAlert.setContentText("Avaliação excluída com sucesso.");
-                        successAlert.showAndWait();
+                        showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Avaliação excluída com sucesso.");
                         refreshReviews();
                     } else {
                         String finalMessage = response.optString("mensagem", "Erro ao excluir avaliação.");
@@ -306,13 +312,22 @@ public class MovieDetailController {
         new Thread(refreshTask).start();
     }
 
-
     private void showErrorAlert(String message) {
+        showAlert(Alert.AlertType.ERROR, "Erro", message);
+    }
+
+    private void showAlert(Alert.AlertType type, String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Erro");
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(message);
+            try {
+                alert.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+                alert.getDialogPane().getStyleClass().add("root");
+            } catch (NullPointerException e) {
+                System.err.println("Não foi possível carregar o CSS para o Alerta.");
+            }
             alert.showAndWait();
         });
     }

@@ -7,6 +7,7 @@ import javafx.stage.Stage;
 import network.ServerConnection;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Objects;
 
 public class Main extends Application {
     @Override
@@ -14,7 +15,8 @@ public class Main extends Application {
         URL fxmlLocation = Main.class.getResource("/view/ConnectionView.fxml");
         FXMLLoader fxmlLoader = new FXMLLoader(fxmlLocation);
 
-        Scene scene = new Scene(fxmlLoader.load(), 300, 250);
+        Scene scene = new Scene(fxmlLoader.load(), 350, 300);
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
         stage.setTitle("VoteFlix Client - Conexão");
         stage.setScene(scene);
         stage.show();

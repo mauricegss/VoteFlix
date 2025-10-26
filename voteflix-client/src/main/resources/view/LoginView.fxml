@@ -6,22 +6,22 @@
 <?import javafx.scene.control.PasswordField?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" prefHeight="300.0" prefWidth="350.0" spacing="15.0" xmlns="http://javafx.com/javafx/21"
-      xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.LoginController">
+<VBox alignment="CENTER" prefHeight="350.0" prefWidth="350.0" spacing="15.0" xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1" fx:controller="controller.LoginController" styleClass="login-container">
     <padding>
-        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+        <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
     </padding>
-    <Label text="Autenticação">
-        <font>
-            <Font name="System Bold" size="24.0"/>
-        </font>
+    <Label text="VOTEFLIX" styleClass="brand-title">
+        <VBox.margin>
+            <Insets bottom="10.0" />
+        </VBox.margin>
     </Label>
+    <Label text="Autenticação" styleClass="header-label"/>
     <TextField fx:id="usernameField" maxWidth="250.0" promptText="Usuário"/>
     <PasswordField fx:id="passwordField" maxWidth="250.0" promptText="Senha"/>
-    <Button fx:id="loginButton" onAction="#handleLoginButtonAction" text="Entrar"/>
-    <Button onAction="#handleRegisterButtonAction" style="-fx-background-color: transparent; -fx-underline: true;"
+    <Button fx:id="loginButton" onAction="#handleLoginButtonAction" text="Entrar" defaultButton="true"/>
+    <Button onAction="#handleRegisterButtonAction" styleClass="hyperlink-button"
             text="Cadastrar Novo Usuário"/>
-    <Label fx:id="statusLabel" textFill="RED"/>
+    <Label fx:id="statusLabel" styleClass="status-label"/>
 </VBox>
