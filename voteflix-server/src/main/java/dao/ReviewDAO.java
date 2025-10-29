@@ -44,8 +44,6 @@ public class ReviewDAO {
                     review.setData(currentDateStr);
                 } else {
                     System.err.println("Aviso: Não foi possível obter o ID gerado para a nova review.");
-                    conn.rollback();
-                    throw new SQLException("Falha ao obter o ID da review após a inserção.");
                 }
             }
 
@@ -57,15 +55,8 @@ public class ReviewDAO {
             if (conn != null) try { conn.rollback(); } catch (SQLException ex) { System.err.println("Erro ao reverter transação em createReview: " + ex.getMessage()); }
             throw e;
         } finally {
-            if (pstmt != null) try { pstmt.close(); } catch (SQLException e) { /* ignore */ }
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    System.err.println("Erro ao fechar conexão em createReview: " + e.getMessage());
-                }
-            }
+            closeStatement(pstmt, "createReview");
+            setAutoCommitTrue(conn, "createReview");
         }
     }
 
@@ -147,15 +138,8 @@ public class ReviewDAO {
             if (conn != null) try { conn.rollback(); } catch (SQLException ex) { System.err.println("Erro ao reverter transação em updateReview: " + ex.getMessage()); }
             throw e;
         } finally {
-            if (pstmt != null) try { pstmt.close(); } catch (SQLException e) { /* ignore */ }
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    System.err.println("Erro ao fechar conexão em updateReview: " + e.getMessage());
-                }
-            }
+            closeStatement(pstmt, "updateReview");
+            setAutoCommitTrue(conn, "updateReview");
         }
         return success;
     }
@@ -185,6 +169,9 @@ public class ReviewDAO {
                 conn.rollback();
                 return false;
             }
+            closeResultSet(rs, "deleteReview");
+            closeStatement(pstmtSelect, "deleteReview - Select");
+
 
             pstmtDelete = conn.prepareStatement(sqlDelete);
             pstmtDelete.setInt(1, reviewId);
@@ -204,17 +191,10 @@ public class ReviewDAO {
             if (conn != null) try { conn.rollback(); } catch (SQLException ex) { System.err.println("Erro ao reverter transação em deleteReview: " + ex.getMessage()); }
             throw e;
         } finally {
-            if (rs != null) try { rs.close(); } catch (SQLException e) { /* ignore */ }
-            if (pstmtSelect != null) try { pstmtSelect.close(); } catch (SQLException e) { /* ignore */ }
-            if (pstmtDelete != null) try { pstmtDelete.close(); } catch (SQLException e) { /* ignore */ }
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    System.err.println("Erro ao fechar conexão em deleteReview: " + e.getMessage());
-                }
-            }
+            closeResultSet(rs, "deleteReview");
+            closeStatement(pstmtSelect, "deleteReview - Select");
+            closeStatement(pstmtDelete, "deleteReview - Delete");
+            setAutoCommitTrue(conn, "deleteReview");
         }
         return success;
     }
@@ -243,6 +223,8 @@ public class ReviewDAO {
                 conn.rollback();
                 return false;
             }
+            closeResultSet(rs, "deleteReviewAsAdmin");
+            closeStatement(pstmtSelect, "deleteReviewAsAdmin - Select");
 
             pstmtDelete = conn.prepareStatement(sqlDelete);
             pstmtDelete.setInt(1, reviewId);
@@ -261,41 +243,40 @@ public class ReviewDAO {
             if (conn != null) try { conn.rollback(); } catch (SQLException ex) { System.err.println("Erro ao reverter transação em deleteReviewAsAdmin: " + ex.getMessage()); }
             throw e;
         } finally {
-            if (rs != null) try { rs.close(); } catch (SQLException e) { /* ignore */ }
-            if (pstmtSelect != null) try { pstmtSelect.close(); } catch (SQLException e) { /* ignore */ }
-            if (pstmtDelete != null) try { pstmtDelete.close(); } catch (SQLException e) { /* ignore */ }
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    System.err.println("Erro ao fechar conexão em deleteReviewAsAdmin: " + e.getMessage());
-                }
-            }
+            closeResultSet(rs, "deleteReviewAsAdmin");
+            closeStatement(pstmtSelect, "deleteReviewAsAdmin - Select");
+            closeStatement(pstmtDelete, "deleteReviewAsAdmin - Delete");
+            setAutoCommitTrue(conn, "deleteReviewAsAdmin");
         }
         return success;
     }
 
     private void updateMovieRating(Connection conn, int movieId) throws SQLException {
-        String sqlAvg = "SELECT AVG(CAST(nota AS REAL)), COUNT(id) FROM reviews WHERE id_filme = ?";
+        String sqlSumCount = "SELECT SUM(nota), COUNT(id) FROM reviews WHERE id_filme = ?";
         String sqlUpdate = "UPDATE filmes SET nota = ?, qtd_avaliacoes = ? WHERE id = ?";
 
-        double averageRating = 0.0;
+        int reviewSum = 0;
         int reviewCount = 0;
+        double averageRating;
 
-        try (PreparedStatement pstmtAvg = conn.prepareStatement(sqlAvg)) {
-            pstmtAvg.setInt(1, movieId);
-            try (ResultSet rsAvg = pstmtAvg.executeQuery()) {
-                if (rsAvg.next()) {
-                    averageRating = rsAvg.getDouble(1);
-                    reviewCount = rsAvg.getInt(2);
+        try (PreparedStatement pstmtSumCount = conn.prepareStatement(sqlSumCount)) {
+            pstmtSumCount.setInt(1, movieId);
+            try (ResultSet rsSumCount = pstmtSumCount.executeQuery()) {
+                if (rsSumCount.next()) {
+                    reviewSum = rsSumCount.getInt(1);
+                    reviewCount = rsSumCount.getInt(2);
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Erro ao calcular média/contagem de reviews para filme ID " + movieId + ": " + e.getMessage());
+            System.err.println("Erro ao calcular soma/contagem de reviews para filme ID " + movieId + ": " + e.getMessage());
             throw e;
         }
 
+        if (reviewCount > 0) {
+            averageRating = (double) reviewSum / reviewCount;
+        } else {
+            averageRating = 0.0;
+        }
 
         try (PreparedStatement pstmtUpdate = conn.prepareStatement(sqlUpdate)) {
             pstmtUpdate.setDouble(1, averageRating);
@@ -306,7 +287,6 @@ public class ReviewDAO {
             System.err.println("Erro ao atualizar nota/contagem no filme ID " + movieId + ": " + e.getMessage());
             throw e;
         }
-
     }
 
     private Review mapResultSetToReview(ResultSet rs) throws SQLException {
@@ -320,5 +300,35 @@ public class ReviewDAO {
         review.setDescricao(rs.getString("descricao"));
         review.setData(rs.getString("data"));
         return review;
+    }
+
+    private void closeStatement(Statement stmt, String methodName) {
+        if (stmt != null) {
+            try {
+                stmt.close();
+            } catch (SQLException e) {
+                System.err.println("Erro ao fechar Statement em " + methodName + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void closeResultSet(ResultSet rs, String methodName) {
+        if (rs != null) {
+            try {
+                rs.close();
+            } catch (SQLException e) {
+                System.err.println("Erro ao fechar ResultSet em " + methodName + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void setAutoCommitTrue(Connection conn, String methodName) {
+        if (conn != null) {
+            try {
+                conn.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Erro ao restaurar autoCommit em " + methodName + ": " + e.getMessage());
+            }
+        }
     }
 }

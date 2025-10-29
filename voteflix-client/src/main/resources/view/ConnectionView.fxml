@@ -17,7 +17,7 @@
         </VBox.margin>
     </Label>
     <Label text="Conectar ao Servidor" styleClass="header-label"/>
-    <TextField fx:id="ipField" maxWidth="250.0" promptText="Endereço IP" text="127.0.0.1"/>
+    <TextField fx:id="ipField" maxWidth="250.0" promptText="Endereço IP" text="10.20.8.1"/>
     <TextField fx:id="portField" maxWidth="250.0" promptText="Porta" text="22222"/>
     <Button fx:id="connectButton" onAction="#handleConnectButton" text="Conectar" defaultButton="true"/>
     <Label fx:id="statusLabel" styleClass="status-label"/>
