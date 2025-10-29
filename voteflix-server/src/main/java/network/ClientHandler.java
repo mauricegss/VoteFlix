@@ -101,12 +101,6 @@ public class ClientHandler {
 
             controller.log("-> Para " + clientAddr + ": " + response, ServerController.LogType.REQUEST);
             queueResponse(response);
-
-            if (needsToClose) {
-                try {
-                    channel.close();
-                } catch (IOException e) { /* ignora */ }
-            }
         }
     }
 
@@ -119,21 +113,22 @@ public class ClientHandler {
         server.registerForWrites(this);
     }
 
-    public void handleWrite(SelectionKey key) throws IOException {
+    public boolean handleWrite(SelectionKey key) throws IOException {
         synchronized (writeQueue) {
             while (!writeQueue.isEmpty()) {
                 ByteBuffer buffer = writeQueue.peek();
                 channel.write(buffer);
 
                 if (buffer.hasRemaining()) {
-                    return;
+                    return true;
                 }
-
                 writeQueue.poll();
             }
         }
 
         key.interestOps(SelectionKey.OP_READ);
+
+        return !needsToClose || !writeQueue.isEmpty();
     }
 
     private String processRequest(String jsonRequest) {
