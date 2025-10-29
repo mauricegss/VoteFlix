@@ -11,29 +11,37 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.JwtUtil;
-import java.io.BufferedReader;
+
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Queue;
 
-public class ClientHandler implements Runnable {
-    private final Socket clientSocket;
+public class ClientHandler {
+    private final SocketChannel channel;
     private final ServerController controller;
     private final UserDAO userDAO;
     private final MovieDAO movieDAO;
     private final ReviewDAO reviewDAO;
     private final Server server;
-    private PrintWriter out;
-    private BufferedReader in;
     private String username;
     private boolean needsToClose = false;
+
+    private final ByteBuffer readBuffer = ByteBuffer.allocate(8192); // Buffer de 8KB
+    private final StringBuilder lineBuilder = new StringBuilder();
+    private final Queue<ByteBuffer> writeQueue = new LinkedList<>();
+    private final Charset charset = StandardCharsets.UTF_8;
 
     private static final Map<String, String> RESPONSE_MESSAGES = new HashMap<>();
     static {
@@ -48,8 +56,8 @@ public class ClientHandler implements Runnable {
         RESPONSE_MESSAGES.put("500", "Erro: Falha interna do servidor");
     }
 
-    public ClientHandler(Socket socket, ServerController controller, Server server) {
-        this.clientSocket = socket;
+    public ClientHandler(SocketChannel channel, ServerController controller, Server server) {
+        this.channel = channel;
         this.controller = controller;
         this.server = server;
         this.userDAO = new UserDAO();
@@ -57,30 +65,93 @@ public class ClientHandler implements Runnable {
         this.reviewDAO = new ReviewDAO();
     }
 
-    @Override
-    public void run() {
-        try {
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    /**
+     * Chamado pelo Server quando há dados para ler.
+     */
+    public void handleRead() throws IOException {
+        readBuffer.clear();
+        int bytesRead = channel.read(readBuffer);
 
-            String inputLine;
-            while ((inputLine = in.readLine()) != null) {
-                String clientAddr = getIdentifier();
-                controller.log("<- De " + clientAddr + ": " + inputLine, ServerController.LogType.REQUEST);
-                String response = processRequest(inputLine);
-                out.println(response);
-                controller.log("-> Para " + clientAddr + ": " + response, ServerController.LogType.REQUEST);
-                if (needsToClose) {
-                    break;
-                }
-            }
-        } catch (SocketException e) {
-            controller.log("Conexão com " + getIdentifier() + " foi perdida.", ServerController.LogType.DISCONNECTION);
-        } catch (IOException e) {
-            controller.log("Erro no handler para " + getIdentifier() + ": " + e.getMessage(), ServerController.LogType.ERROR);
-        } finally {
-            closeConnection();
+        if (bytesRead == -1) {
+            // Conexão fechada pelo cliente
+            throw new IOException("Cliente fechou a conexão.");
         }
+
+        if (bytesRead > 0) {
+            readBuffer.flip();
+            String chunk = charset.decode(readBuffer).toString();
+            lineBuilder.append(chunk);
+
+            // Processa todas as linhas completas (terminadas em \n) que recebemos
+            processBufferLines();
+        }
+    }
+
+    private void processBufferLines() {
+        while (true) {
+            int newlineIndex = lineBuilder.indexOf("\n");
+            if (newlineIndex == -1) {
+                break; // Não há uma linha completa, aguarda mais dados
+            }
+
+            // Extrai a linha completa
+            String line = lineBuilder.substring(0, newlineIndex);
+            // Remove a linha (e o \n) do buffer
+            lineBuilder.delete(0, newlineIndex + 1);
+
+            if (line.isEmpty()) continue;
+
+            String clientAddr = getIdentifier();
+            controller.log("<- De " + clientAddr + ": " + line, ServerController.LogType.REQUEST);
+            String response = processRequest(line);
+
+            controller.log("-> Para " + clientAddr + ": " + response, ServerController.LogType.REQUEST);
+            queueResponse(response);
+
+            if (needsToClose) {
+                // A resposta de logout/delete foi enfileirada, agora podemos fechar.
+                // O handleWrite será chamado para enviar a resposta final.
+                try {
+                    channel.close();
+                } catch (IOException e) { /* ignora */ }
+            }
+        }
+    }
+
+    /**
+     * Enfileira uma resposta para ser enviada e registra interesse em escrita.
+     */
+    private void queueResponse(String response) {
+        String line = response + "\n";
+        ByteBuffer buffer = charset.encode(line);
+        synchronized (writeQueue) {
+            writeQueue.add(buffer);
+        }
+        server.registerForWrites(this); // Informa o servidor que queremos escrever
+    }
+
+    /**
+     * Chamado pelo Server quando o canal está pronto para escrever.
+     */
+    public void handleWrite(SelectionKey key) throws IOException {
+        synchronized (writeQueue) {
+            while (!writeQueue.isEmpty()) {
+                ByteBuffer buffer = writeQueue.peek();
+                channel.write(buffer);
+
+                if (buffer.hasRemaining()) {
+                    // O buffer do socket está cheio, não conseguimos escrever tudo.
+                    // Mantemos o OP_WRITE e tentamos de novo mais tarde.
+                    return;
+                }
+
+                // Buffer foi totalmente escrito, remove da fila
+                writeQueue.poll();
+            }
+        }
+
+        // Fila está vazia, não estamos mais interessados em escrever.
+        key.interestOps(SelectionKey.OP_READ);
     }
 
     private String processRequest(String jsonRequest) {
@@ -170,7 +241,7 @@ public class ClientHandler implements Runnable {
             User foundUser = userDAO.findByUsername(user);
             if (foundUser != null && foundUser.getSenha().equals(pass)) {
                 this.username = user;
-                String userWithIp = String.format("%s (%s)", user, clientSocket.getInetAddress().getHostAddress());
+                String userWithIp = String.format("%s (%s)", user, getClientIpAddress());
                 server.addAuthenticatedUser(userWithIp);
 
                 String role = "admin".equals(user) ? "admin" : "user";
@@ -648,21 +719,38 @@ public class ClientHandler implements Runnable {
         return response;
     }
 
+    /**
+     * Limpa o estado deste handler. Não fecha o canal (o Server faz isso).
+     */
     public void closeConnection() {
+        server.removeClient(this);
+        controller.log("Conexão com " + getIdentifier() + " fechada.", ServerController.LogType.DISCONNECTION);
+    }
+
+    public String getIdentifier() {
+        if (username != null) {
+            return username;
+        }
         try {
-            if (in != null) in.close();
-            if (out != null) out.close();
-            if (clientSocket != null && !clientSocket.isClosed()) clientSocket.close();
+            SocketAddress addr = channel.getRemoteAddress();
+            return (addr != null) ? addr.toString() : "Cliente desconectado";
         } catch (IOException e) {
-            controller.log("Erro ao fechar conexão com cliente: " + e.getMessage(), ServerController.LogType.ERROR);
-        } finally {
-            server.removeClient(this);
-            controller.log("Conexão com " + getIdentifier() + " fechada.", ServerController.LogType.DISCONNECTION);
+            return "Cliente desconectado";
         }
     }
-    public String getIdentifier() {
-        return username != null ? username : (clientSocket != null ? clientSocket.getInetAddress().toString() : "Cliente desconectado");
-    }
+
     public String getUsername() { return username; }
-    public String getClientIpAddress() { return clientSocket != null ? clientSocket.getInetAddress().getHostAddress() : "N/A"; }
+
+    public String getClientIpAddress() {
+        try {
+            InetSocketAddress addr = (InetSocketAddress) channel.getRemoteAddress();
+            return (addr != null) ? addr.getAddress().getHostAddress() : "N/A";
+        } catch (IOException e) {
+            return "N/A";
+        }
+    }
+
+    public SocketChannel getChannel() {
+        return channel;
+    }
 }
