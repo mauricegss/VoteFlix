@@ -38,19 +38,20 @@ public class ClientHandler {
     private String username;
     private boolean needsToClose = false;
 
-    private final ByteBuffer readBuffer = ByteBuffer.allocate(8192); // Buffer de 8KB
+    private final ByteBuffer readBuffer = ByteBuffer.allocate(8192);
     private final StringBuilder lineBuilder = new StringBuilder();
     private final Queue<ByteBuffer> writeQueue = new LinkedList<>();
     private final Charset charset = StandardCharsets.UTF_8;
 
     private static final Map<String, String> RESPONSE_MESSAGES = new HashMap<>();
     static {
-        RESPONSE_MESSAGES.put("200", "Sucesso: operação realizada com sucesso");
+        RESPONSE_MESSAGES.put("200", "Sucesso: Operação realizada com sucesso");
         RESPONSE_MESSAGES.put("201", "Sucesso: Recurso cadastrado");
         RESPONSE_MESSAGES.put("400", "Erro: Operação não encontrada ou inválida");
         RESPONSE_MESSAGES.put("401", "Erro: Token inválido");
         RESPONSE_MESSAGES.put("403", "Erro: sem permissão");
         RESPONSE_MESSAGES.put("404", "Erro: Recurso inexistente");
+        RESPONSE_MESSAGES.put("405", "Erro: Campos inválidos, verifique o tipo e quantidade de caracteres");
         RESPONSE_MESSAGES.put("409", "Erro: Recurso ja existe");
         RESPONSE_MESSAGES.put("422", "Erro: Chaves faltantes ou invalidas");
         RESPONSE_MESSAGES.put("500", "Erro: Falha interna do servidor");
@@ -65,15 +66,11 @@ public class ClientHandler {
         this.reviewDAO = new ReviewDAO();
     }
 
-    /**
-     * Chamado pelo Server quando há dados para ler.
-     */
     public void handleRead() throws IOException {
         readBuffer.clear();
         int bytesRead = channel.read(readBuffer);
 
         if (bytesRead == -1) {
-            // Conexão fechada pelo cliente
             throw new IOException("Cliente fechou a conexão.");
         }
 
@@ -82,7 +79,6 @@ public class ClientHandler {
             String chunk = charset.decode(readBuffer).toString();
             lineBuilder.append(chunk);
 
-            // Processa todas as linhas completas (terminadas em \n) que recebemos
             processBufferLines();
         }
     }
@@ -91,12 +87,10 @@ public class ClientHandler {
         while (true) {
             int newlineIndex = lineBuilder.indexOf("\n");
             if (newlineIndex == -1) {
-                break; // Não há uma linha completa, aguarda mais dados
+                break;
             }
 
-            // Extrai a linha completa
             String line = lineBuilder.substring(0, newlineIndex);
-            // Remove a linha (e o \n) do buffer
             lineBuilder.delete(0, newlineIndex + 1);
 
             if (line.isEmpty()) continue;
@@ -109,8 +103,6 @@ public class ClientHandler {
             queueResponse(response);
 
             if (needsToClose) {
-                // A resposta de logout/delete foi enfileirada, agora podemos fechar.
-                // O handleWrite será chamado para enviar a resposta final.
                 try {
                     channel.close();
                 } catch (IOException e) { /* ignora */ }
@@ -118,21 +110,15 @@ public class ClientHandler {
         }
     }
 
-    /**
-     * Enfileira uma resposta para ser enviada e registra interesse em escrita.
-     */
     private void queueResponse(String response) {
         String line = response + "\n";
         ByteBuffer buffer = charset.encode(line);
         synchronized (writeQueue) {
             writeQueue.add(buffer);
         }
-        server.registerForWrites(this); // Informa o servidor que queremos escrever
+        server.registerForWrites(this);
     }
 
-    /**
-     * Chamado pelo Server quando o canal está pronto para escrever.
-     */
     public void handleWrite(SelectionKey key) throws IOException {
         synchronized (writeQueue) {
             while (!writeQueue.isEmpty()) {
@@ -140,17 +126,13 @@ public class ClientHandler {
                 channel.write(buffer);
 
                 if (buffer.hasRemaining()) {
-                    // O buffer do socket está cheio, não conseguimos escrever tudo.
-                    // Mantemos o OP_WRITE e tentamos de novo mais tarde.
                     return;
                 }
 
-                // Buffer foi totalmente escrito, remove da fila
                 writeQueue.poll();
             }
         }
 
-        // Fila está vazia, não estamos mais interessados em escrever.
         key.interestOps(SelectionKey.OP_READ);
     }
 
@@ -161,9 +143,19 @@ public class ClientHandler {
 
             switch (operacao) {
                 case "LOGIN":
+                    if (!request.has("usuario") || !request.has("senha")) {
+                        return createErrorResponse(422);
+                    }
                     return handleLogin(request);
                 case "CRIAR_USUARIO":
+                    if (!request.has("usuario")) {
+                        return createErrorResponse(422);
+                    }
                     return handleCreateUser(request);
+            }
+
+            if (!request.has("token")) {
+                return createErrorResponse(422);
             }
 
             String token = request.optString("token");
@@ -183,7 +175,7 @@ public class ClientHandler {
                 User currentUser = userDAO.findById(userIdFromToken);
                 if (currentUser == null) {
                     needsToClose = true;
-                    return createErrorResponse(401, "Erro: Sua conta foi excluída ou não existe mais. Por favor, feche o programa e tente novamente.");
+                    return createErrorResponse(404);
                 }
             } catch (SQLException e) {
                 controller.log("Erro ao verificar existência do usuário: " + e.getMessage(), ServerController.LogType.ERROR);
@@ -195,6 +187,9 @@ public class ClientHandler {
                 case "LOGOUT":
                     return handleLogout();
                 case "EDITAR_PROPRIO_USUARIO":
+                    if (!request.has("usuario")) {
+                        return createErrorResponse(422);
+                    }
                     return handleUpdateOwnPassword(request, userFromToken);
                 case "EXCLUIR_PROPRIO_USUARIO":
                     return handleDeleteOwnUser(userFromToken);
@@ -251,7 +246,7 @@ public class ClientHandler {
                 response.put("token", token);
                 return response.toString();
             } else {
-                return createErrorResponse(401);
+                return createErrorResponse(403);
             }
         } catch (SQLException e) {
             controller.log("Erro SQL no login: " + e.getMessage(), ServerController.LogType.ERROR);
@@ -268,7 +263,7 @@ public class ClientHandler {
             String password = userJson.getString("senha");
 
             if (isInvalidUserFields(username, password)) {
-                return createErrorResponse(422);
+                return createErrorResponse(405);
             }
             if ("admin".equalsIgnoreCase(username)) {
                 return createErrorResponse(403);
@@ -287,16 +282,22 @@ public class ClientHandler {
             controller.log("Erro SQL ao criar usuário: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException e) {
-            return createErrorResponse(400);
+            return createErrorResponse(422);
         }
     }
 
     private String handleUpdateOwnPassword(JSONObject request, String userFromToken) {
         try {
-            String newPassword = request.getJSONObject("usuario").getString("senha");
-            if (isInvalidUserFields(userFromToken, newPassword)) {
-                return createErrorResponse(422);
+            if ("admin".equalsIgnoreCase(userFromToken)) {
+                return createErrorResponse(403);
             }
+
+            String newPassword = request.getJSONObject("usuario").getString("senha");
+
+            if (isInvalidUserFields(userFromToken, newPassword)) {
+                return createErrorResponse(405);
+            }
+
             if (userDAO.updatePassword(userFromToken, newPassword)) {
                 return createSuccessResponse("200").toString();
             } else {
@@ -306,7 +307,7 @@ public class ClientHandler {
             controller.log("Erro SQL ao atualizar própria senha: " + e.getMessage(), ServerController.LogType.ERROR);
             return createErrorResponse(500);
         } catch (JSONException e) {
-            return createErrorResponse(400);
+            return createErrorResponse(422);
         }
     }
 
@@ -719,9 +720,6 @@ public class ClientHandler {
         return response;
     }
 
-    /**
-     * Limpa o estado deste handler. Não fecha o canal (o Server faz isso).
-     */
     public void closeConnection() {
         server.removeClient(this);
         controller.log("Conexão com " + getIdentifier() + " fechada.", ServerController.LogType.DISCONNECTION);
@@ -733,9 +731,9 @@ public class ClientHandler {
         }
         try {
             SocketAddress addr = channel.getRemoteAddress();
-            return (addr != null) ? addr.toString() : "Cliente desconectado";
+            return (addr != null) ? addr.toString() : "Cliente desconhecido";
         } catch (IOException e) {
-            return "Cliente desconectado";
+            return "Cliente desconhecido";
         }
     }
 
