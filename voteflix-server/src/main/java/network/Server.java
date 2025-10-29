@@ -39,7 +39,7 @@ public class Server implements Runnable {
 
             while (running) {
                 try {
-                    selector.select(); // Bloqueia até que um canal esteja pronto
+                    selector.select();
                     if (!running) break;
 
                     Iterator<SelectionKey> keys = selector.selectedKeys().iterator();
@@ -96,9 +96,14 @@ public class Server implements Runnable {
     private void handleWrite(SelectionKey key) {
         ClientHandler handler = (ClientHandler) key.attachment();
         try {
-            handler.handleWrite(key);
+            boolean keepAlive = handler.handleWrite(key);
+
+            if (!keepAlive) {
+                controller.log("Cliente desconectado (solicitado): " + handler.getIdentifier(), ServerController.LogType.DISCONNECTION);
+                disconnectClient(key);
+            }
         } catch (IOException e) {
-            controller.log("Cliente desconectado (write): " + handler.getIdentifier(), ServerController.LogType.DISCONNECTION);
+            controller.log("Cliente desconectado (erro de write): " + handler.getIdentifier(), ServerController.LogType.ERROR);
             disconnectClient(key);
         }
     }
@@ -123,7 +128,7 @@ public class Server implements Runnable {
 
         ClientHandler handler = (ClientHandler) key.attachment();
         if (handler != null) {
-            handler.closeConnection(); // Chama o cleanup lógico (remover da lista, etc)
+            handler.closeConnection();
         }
 
         try {
@@ -138,7 +143,7 @@ public class Server implements Runnable {
         running = false;
         try {
             if (selector != null && selector.isOpen()) {
-                selector.wakeup(); // Força o selector.select() a sair
+                selector.wakeup();
                 selector.close();
             }
             if (serverSocketChannel != null && serverSocketChannel.isOpen()) {

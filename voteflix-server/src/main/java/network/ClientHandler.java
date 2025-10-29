@@ -48,7 +48,7 @@ public class ClientHandler {
         RESPONSE_MESSAGES.put("200", "Sucesso: Operação realizada com sucesso");
         RESPONSE_MESSAGES.put("201", "Sucesso: Recurso cadastrado");
         RESPONSE_MESSAGES.put("400", "Erro: Operação não encontrada ou inválida");
-        RESPONSE_MESSAGES.put("401", "Erro: Token inválido");
+        RESPONSE_MESSAGES.put("401", "Erro: Autenticação falhou (credenciais ou token inválidos)");
         RESPONSE_MESSAGES.put("403", "Erro: sem permissão");
         RESPONSE_MESSAGES.put("404", "Erro: Recurso inexistente");
         RESPONSE_MESSAGES.put("405", "Erro: Campos inválidos, verifique o tipo e quantidade de caracteres");
@@ -241,7 +241,7 @@ public class ClientHandler {
                 response.put("token", token);
                 return response.toString();
             } else {
-                return createErrorResponse(403);
+                return createErrorResponse(401);
             }
         } catch (SQLException e) {
             controller.log("Erro SQL no login: " + e.getMessage(), ServerController.LogType.ERROR);
