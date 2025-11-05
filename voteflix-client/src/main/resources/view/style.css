@@ -172,7 +172,7 @@
 }
 .tab-pane .tab .label {
     -fx-font-weight: bold;
-    -fx-text-fill: #B3B3B3;
+    -fx-text-fill: #FFFFFF; /* Alterado de #B3B3B3 */
 }
 .tab-pane .tab:selected {
     -fx-background-color: #141414;
