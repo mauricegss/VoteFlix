@@ -11,7 +11,7 @@ import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
 import network.ServerConnection;
 import session.SessionManager;
-import util.TokenDecoder;
+// import util.TokenDecoder; // Não é mais usado para role
 
 import java.io.IOException;
 import java.util.Objects;
@@ -26,8 +26,8 @@ public class MainController {
 
     @FXML
     private void initialize() {
-        String token = SessionManager.getInstance().getToken();
-        String role = TokenDecoder.getRoleFromToken(token);
+        // Pega o Role que o LoginController salvou
+        String role = SessionManager.getInstance().getRole();
 
         try {
             profileTab.setContent(FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/view/ProfileView.fxml"))));

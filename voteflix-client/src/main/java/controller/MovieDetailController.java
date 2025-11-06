@@ -23,7 +23,7 @@ import network.ServerConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import session.SessionManager;
-import util.TokenDecoder;
+// import util.TokenDecoder; // Não é mais usado aqui
 
 import java.io.IOException;
 import java.util.Objects;
@@ -50,9 +50,9 @@ public class MovieDetailController {
 
     @FXML
     private void initialize() {
-        String token = SessionManager.getInstance().getToken();
-        currentUserRole = TokenDecoder.getRoleFromToken(token);
-        currentUserId = TokenDecoder.getUserIdFromToken(token);
+        // Pega o Role e ID que o LoginController salvou
+        currentUserRole = SessionManager.getInstance().getRole();
+        currentUserId = SessionManager.getInstance().getUserId();
 
         synopsisText.getStyleClass().add("synopsis-text");
         synopsisText.setStyle("-fx-fill: #E0E0E0;");

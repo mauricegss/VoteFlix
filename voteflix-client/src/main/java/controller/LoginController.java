@@ -11,6 +11,7 @@ import network.ServerConnection;
 import org.json.JSONException;
 import org.json.JSONObject;
 import session.SessionManager;
+import util.TokenDecoder; // Ainda precisamos dele para o UserID
 
 import java.io.IOException;
 import java.net.URL;
@@ -38,13 +39,14 @@ public class LoginController {
             }
         };
 
-        loginTask.setOnSucceeded(event -> handleLoginResponse(loginTask.getValue()));
-        loginTask.setOnFailed(event -> handleLoginResponse(null));
+        loginTask.setOnSucceeded(event -> handleLoginResponse(loginTask.getValue(), username)); // Passa o username
+        loginTask.setOnFailed(event -> handleLoginResponse(null, username));
 
         new Thread(loginTask).start();
     }
 
-    private void handleLoginResponse(String responseJson) {
+    // Modificado para receber o username
+    private void handleLoginResponse(String responseJson, String username) {
         Platform.runLater(() -> {
             loginButton.setDisable(false);
             if (responseJson == null) {
@@ -58,7 +60,19 @@ public class LoginController {
 
                 if ("200".equals(status)) {
                     String token = response.getString("token");
+
+                    // --- AQUI ESTÁ A LÓGICA SOLICITADA ---
+                    // 1. Determina o role baseado no NOME DE USUÁRIO
+                    String role = "admin".equalsIgnoreCase(username) ? "admin" : "user";
+
+                    // 2. Ainda precisamos do UserID para outras partes do app
+                    Integer userId = TokenDecoder.getUserIdFromToken(token);
+                    // -----------------------------------------
+
                     SessionManager.getInstance().setToken(token);
+                    SessionManager.getInstance().setRole(role); // Salva o role determinado pelo username
+                    SessionManager.getInstance().setUserId(userId); // Salva o userId do token
+
                     openMainWindow();
                 } else {
                     String finalMessage = response.optString("mensagem", "Erro desconhecido.");

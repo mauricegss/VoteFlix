@@ -5,6 +5,8 @@ import java.util.Base64;
 
 public class TokenDecoder {
 
+    // ESTE METODO NAO E MAIS NECESSARIO
+    /*
     public static String getRoleFromToken(String token) {
         if (token == null || token.isEmpty()) {
             return null;
@@ -21,6 +23,7 @@ public class TokenDecoder {
         }
         return null;
     }
+    */
 
     public static Integer getUserIdFromToken(String token) {
         if (token == null || token.isEmpty()) {

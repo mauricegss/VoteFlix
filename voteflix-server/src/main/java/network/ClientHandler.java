@@ -22,11 +22,14 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays; // Adicionado
 import java.util.HashMap;
+import java.util.HashSet; // Adicionado
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set; // Adicionado
 
 public class ClientHandler {
     private final SocketChannel channel;
@@ -56,6 +59,13 @@ public class ClientHandler {
         RESPONSE_MESSAGES.put("422", "Erro: Chaves faltantes ou invalidas");
         RESPONSE_MESSAGES.put("500", "Erro: Falha interna do servidor");
     }
+
+    // Adicionada lista de gêneros permitidos
+    private static final Set<String> PREDEFINED_GENRES = new HashSet<>(Arrays.asList(
+            "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Ficção Científica",
+            "Terror", "Romance", "Documentário", "Musical", "Animação"
+    ));
+
 
     public ClientHandler(SocketChannel channel, ServerController controller, Server server) {
         this.channel = channel;
@@ -333,10 +343,12 @@ public class ClientHandler {
     private String handleCreateMovie(JSONObject request) {
         try {
             JSONObject movieJson = request.getJSONObject("filme");
-            if (isInvalidMovieFields(movieJson)) {
+            List<String> receivedGenres = jsonArrayToList(movieJson.optJSONArray("genero")); // Modificado
+
+            if (isInvalidMovieFields(movieJson, receivedGenres)) { // Modificado
                 return createErrorResponse(422);
             }
-            Movie movie = movieFromJson(movieJson);
+            Movie movie = movieFromJson(movieJson, receivedGenres); // Modificado
             movieDAO.createMovie(movie);
             return createSuccessResponse("201").toString();
         } catch (SQLException e) {
@@ -353,10 +365,12 @@ public class ClientHandler {
     private String handleUpdateMovie(JSONObject request) {
         try {
             JSONObject movieJson = request.getJSONObject("filme");
-            if (!movieJson.has("id") || isInvalidMovieFields(movieJson)) {
+            List<String> receivedGenres = jsonArrayToList(movieJson.optJSONArray("genero")); // Modificado
+
+            if (!movieJson.has("id") || isInvalidMovieFields(movieJson, receivedGenres)) { // Modificado
                 return createErrorResponse(422);
             }
-            Movie movie = movieFromJson(movieJson);
+            Movie movie = movieFromJson(movieJson, receivedGenres); // Modificado
             if (movieDAO.updateMovie(movie)) {
                 return createSuccessResponse("200").toString();
             } else {
@@ -624,35 +638,54 @@ public class ClientHandler {
                 password == null || password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
     }
 
-    private boolean isInvalidMovieFields(JSONObject movieJson) {
+    // Modificado para aceitar List<String> e validar
+    private boolean isInvalidMovieFields(JSONObject movieJson, List<String> generos) {
         if (movieJson == null) return true;
         String titulo = movieJson.optString("titulo");
         String ano = movieJson.optString("ano");
         String sinopse = movieJson.optString("sinopse");
         String diretor = movieJson.optString("diretor");
-        JSONArray genero = movieJson.optJSONArray("genero");
 
-        return titulo.isEmpty() || titulo.length() > 30 ||
+        if (titulo.isEmpty() || titulo.length() > 30 ||
                 !ano.matches("\\d{4}") ||
                 sinopse.length() > 250 ||
                 diretor.isEmpty() ||
-                genero == null || genero.isEmpty();
+                generos == null || generos.isEmpty()) {
+            return true;
+        }
+
+        // Nova validação: checa se todos os gêneros recebidos estão na lista pré-definida
+        for (String g : generos) {
+            if (!PREDEFINED_GENRES.contains(g)) {
+                return true; // Encontrou um gênero inválido
+            }
+        }
+
+        return false;
     }
 
-    private Movie movieFromJson(JSONObject json) throws JSONException{
+    // Adicionado Helper para converter JSONArray para List<String>
+    private List<String> jsonArrayToList(JSONArray jsonArray) {
+        if (jsonArray == null) {
+            return new ArrayList<>();
+        }
+        List<String> list = new ArrayList<>();
+        for (int i = 0; i < jsonArray.length(); i++) {
+            list.add(jsonArray.optString(i));
+        }
+        return list;
+    }
+
+
+    // Modificado para aceitar List<String>
+    private Movie movieFromJson(JSONObject json, List<String> generos) throws JSONException{
         Movie movie = new Movie();
         movie.setId(json.optInt("id"));
         movie.setTitulo(json.getString("titulo"));
         movie.setDiretor(json.getString("diretor"));
         movie.setAno(json.getString("ano"));
         movie.setSinopse(json.getString("sinopse"));
-
-        JSONArray generosJson = json.getJSONArray("genero");
-        List<String> generos = new ArrayList<>();
-        for (int i = 0; i < generosJson.length(); i++) {
-            generos.add(generosJson.getString(i));
-        }
-        movie.setGeneros(generos);
+        movie.setGeneros(generos); // Usa a lista já validada
         return movie;
     }
 
