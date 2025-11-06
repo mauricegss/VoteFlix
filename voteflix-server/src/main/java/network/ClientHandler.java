@@ -203,7 +203,7 @@ public class ClientHandler {
                 case "LISTAR_FILMES":
                     return handleListMovies();
                 case "BUSCAR_FILME_ID":
-                    return handleGetMovieById(request);
+                    return handleGetMovieById(request, userIdFromToken);
                 case "CRIAR_REVIEW":
                     return handleCreateReview(request, userIdFromToken, userFromToken, roleFromToken);
                 case "LISTAR_REVIEWS_USUARIO":
@@ -403,7 +403,8 @@ public class ClientHandler {
         }
     }
 
-    private String handleGetMovieById(JSONObject request) {
+    // Recebe o ID do usuário que está fazendo a requisição
+    private String handleGetMovieById(JSONObject request, int requesterId) {
         try {
             int id = Integer.parseInt(request.getString("id_filme"));
             Movie movie = movieDAO.findMovieById(id);
@@ -413,12 +414,18 @@ public class ClientHandler {
             List<Review> reviews = reviewDAO.findReviewsByMovieId(id);
             JSONArray reviewsJson = new JSONArray();
             for (Review review : reviews) {
-                reviewsJson.put(jsonFromReview(review));
+                JSONObject reviewJson = jsonFromReview(review);
+
+                // Adiciona o campo booleano 'isOwnReview'
+                boolean isOwner = (requesterId == review.getIdUsuario());
+                reviewJson.put("isOwnReview", isOwner);
+
+                reviewsJson.put(reviewJson);
             }
 
             JSONObject response = createSuccessResponse("200");
             response.put("filme", jsonFromMovie(movie));
-            response.put("reviews", reviewsJson);
+            response.put("reviews", reviewsJson); // Agora as reviews têm o campo 'isOwnReview'
             return response.toString();
         } catch (NumberFormatException | JSONException e) {
             return createErrorResponse(400);
@@ -480,6 +487,8 @@ public class ClientHandler {
             List<Review> reviews = reviewDAO.findReviewsByUserId(userId);
             JSONArray reviewsJson = new JSONArray();
             for (Review review : reviews) {
+                // Aqui não precisa do 'isOwnReview' porque
+                // o usuário só está vendo as próprias reviews.
                 reviewsJson.put(jsonFromReview(review));
             }
             JSONObject response = createSuccessResponse("200");
@@ -721,6 +730,8 @@ public class ClientHandler {
         reviewJson.put("titulo", review.getTitulo() != null ? review.getTitulo() : "");
         reviewJson.put("descricao", review.getDescricao() != null ? review.getDescricao() : "");
         reviewJson.put("data", review.getData() != null ? review.getData() : "");
+        // Não adicionamos 'isOwnReview' aqui; é adicionado dinamicamente
+        // no 'handleGetMovieById'
         return reviewJson;
     }
 

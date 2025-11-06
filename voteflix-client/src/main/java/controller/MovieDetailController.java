@@ -23,7 +23,7 @@ import network.ServerConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import session.SessionManager;
-// import util.TokenDecoder; // Não é mais usado aqui
+// Não há mais TokenDecoder nem lógica de Role
 
 import java.io.IOException;
 import java.util.Objects;
@@ -44,15 +44,11 @@ public class MovieDetailController {
     private Movie currentMovie;
     private final ObservableList<Review> currentReviews = FXCollections.observableArrayList();
     private Review userExistingReview = null;
-    private String currentUserRole;
-    private Integer currentUserId;
-
+    // As variáveis de 'role' e 'userId' foram completamente removidas.
 
     @FXML
     private void initialize() {
-        // Pega o Role e ID que o LoginController salvou
-        currentUserRole = SessionManager.getInstance().getRole();
-        currentUserId = SessionManager.getInstance().getUserId();
+        // A lógica de pegar 'role' e 'userId' foi removida.
 
         synopsisText.getStyleClass().add("synopsis-text");
         synopsisText.setStyle("-fx-fill: #E0E0E0;");
@@ -61,13 +57,10 @@ public class MovieDetailController {
         reviewsListView.setItems(currentReviews);
         reviewsListView.setPlaceholder(new Label("Carregando avaliações..."));
 
-        if ("user".equals(currentUserRole)) {
-            reviewActionBox.setVisible(true);
-            reviewActionBox.setManaged(true);
-        } else {
-            reviewActionBox.setVisible(false);
-            reviewActionBox.setManaged(false);
-        }
+        // O botão de adicionar/editar review agora é visível para todos.
+        // O servidor vai barrar o 'admin' se ele tentar usar.
+        reviewActionBox.setVisible(true);
+        reviewActionBox.setManaged(true);
     }
 
     public void setMovieDetails(Movie movie, JSONArray reviewsArray) {
@@ -87,15 +80,17 @@ public class MovieDetailController {
                     JSONObject reviewJson = reviewsArray.getJSONObject(i);
                     Review review = parseReviewFromJson(reviewJson);
                     currentReviews.add(review);
-                    if (currentUserId != null && review.getIdUsuario() == currentUserId) {
+
+                    // Verifica o campo booleano 'isOwnReview' que o servidor enviou
+                    if (review.isOwnReview()) {
                         userExistingReview = review;
                     }
                 }
             }
 
-            if ("user".equals(currentUserRole)) {
-                addEditReviewButton.setText(userExistingReview != null ? "Editar Minha Avaliação" : "Adicionar Avaliação");
-            }
+            // O texto do botão muda se o servidor nos disse que temos uma review
+            addEditReviewButton.setText(userExistingReview != null ? "Editar Minha Avaliação" : "Adicionar Avaliação");
+
 
             if (currentReviews.isEmpty()) {
                 reviewsListView.setPlaceholder(new Label("Ainda não há avaliações para este filme."));
@@ -121,6 +116,8 @@ public class MovieDetailController {
         review.setTitulo(json.optString("titulo", ""));
         review.setDescricao(json.optString("descricao", ""));
         review.setData(json.optString("data", ""));
+        // Pega o campo booleano que o servidor enviou
+        review.setOwnReview(json.optBoolean("isOwnReview", false));
         return review;
     }
 
@@ -177,8 +174,16 @@ public class MovieDetailController {
                     );
                     reviewTextLabel.setText(reviewDisplay);
 
-                    boolean canEdit = "user".equals(currentUserRole) && currentUserId != null && review.getIdUsuario() == currentUserId;
-                    boolean canDelete = canEdit || "admin".equals(currentUserRole);
+                    // --- LÓGICA DE UI CORRIGIDA ---
+                    // Pega o booleano 'isOwnReview' que o servidor enviou
+
+                    // Mostra o botão "Editar" APENAS se o servidor disse que a review é sua
+                    boolean canEdit = review.isOwnReview();
+
+                    // Mostra o botão "Excluir" para TODOS.
+                    // O servidor vai validar se o usuário (pelo token) pode ou não
+                    // deletar esta review específica.
+                    boolean canDelete = true;
 
                     editButton.setVisible(canEdit);
                     editButton.setManaged(canEdit);
@@ -193,6 +198,8 @@ public class MovieDetailController {
 
     @FXML
     private void handleAddEditReview() {
+        // 'userExistingReview' é nulo ou a review,
+        // com base no campo 'isOwnReview' do servidor.
         openReviewForm(userExistingReview);
     }
 

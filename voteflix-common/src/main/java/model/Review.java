@@ -13,6 +13,9 @@ public class Review implements Serializable {
     private int nota;
     private String data;
 
+    // CAMPO ADICIONADO (não é um campo do DB, é enviado pelo servidor)
+    private boolean isOwnReview;
+
     public Review() {
     }
 
@@ -79,4 +82,16 @@ public class Review implements Serializable {
     public void setData(String data) {
         this.data = data;
     }
+
+    // --- MÉTODOS ADICIONADOS ---
+    // (Estes são os métodos que estavam faltando)
+
+    public boolean isOwnReview() {
+        return isOwnReview;
+    }
+
+    public void setOwnReview(boolean ownReview) {
+        isOwnReview = ownReview;
+    }
+    // ---------------------------
 }

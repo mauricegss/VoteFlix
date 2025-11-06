@@ -110,7 +110,7 @@ public class ReviewDAO {
         String sql = "UPDATE reviews SET nota = ?, titulo = ?, descricao = ?, data = ? WHERE id = ? AND id_usuario = ?";
         Connection conn = null;
         PreparedStatement pstmt = null;
-        boolean success;
+        boolean success; // <-- CORRIGIDO AQUI
         String currentDateStr = LocalDate.now().format(DATE_FORMATTER);
         try {
             conn = DatabaseConnection.getConnection();
@@ -151,7 +151,7 @@ public class ReviewDAO {
         PreparedStatement pstmtSelect = null;
         PreparedStatement pstmtDelete = null;
         ResultSet rs = null;
-        boolean success;
+        boolean success; // <-- CORRIGIDO AQUI
         int movieId;
 
         try {
@@ -206,7 +206,7 @@ public class ReviewDAO {
         PreparedStatement pstmtSelect = null;
         PreparedStatement pstmtDelete = null;
         ResultSet rs = null;
-        boolean success;
+        boolean success; // <-- CORRIGIDO AQUI
         int movieId;
 
         try {
@@ -251,7 +251,10 @@ public class ReviewDAO {
         return success;
     }
 
-    private void updateMovieRating(Connection conn, int movieId) throws SQLException {
+    /**
+     * Alterado de private para public para ser acessível pelo UserDAO
+     */
+    public void updateMovieRating(Connection conn, int movieId) throws SQLException {
         String sqlSumCount = "SELECT SUM(nota), COUNT(id) FROM reviews WHERE id_filme = ?";
         String sqlUpdate = "UPDATE filmes SET nota = ?, qtd_avaliacoes = ? WHERE id = ?";
 

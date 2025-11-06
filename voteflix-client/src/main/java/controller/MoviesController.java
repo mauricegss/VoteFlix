@@ -10,6 +10,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
@@ -27,8 +28,10 @@ import session.SessionManager;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Optional;
 
-public class UserMovieController {
+// Nome da classe atualizado
+public class MoviesController {
 
     @FXML private TableView<Movie> moviesTable;
     @FXML private TableColumn<Movie, Integer> idColumn;
@@ -39,6 +42,8 @@ public class UserMovieController {
     @FXML private TableColumn<Movie, Double> ratingColumn;
     @FXML private TableColumn<Movie, Void> actionsColumn;
     @FXML private TextField searchIdField;
+    @FXML private Button editButton;
+    @FXML private Button deleteButton;
 
     private final ObservableList<Movie> movieList = FXCollections.observableArrayList();
 
@@ -53,6 +58,12 @@ public class UserMovieController {
         setupActionsColumn();
         moviesTable.setItems(movieList);
         moviesTable.setPlaceholder(new Label("Carregando filmes..."));
+
+        moviesTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            boolean isItemSelected = newSelection != null;
+            editButton.setDisable(!isItemSelected);
+            deleteButton.setDisable(!isItemSelected);
+        });
     }
 
     public void loadMovies() {
@@ -117,7 +128,6 @@ public class UserMovieController {
                 });
             }
 
-
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
@@ -133,9 +143,37 @@ public class UserMovieController {
     }
 
     @FXML
-    private void handleSearchById() {
-        String idText = searchIdField.getText().trim();
-        fetchAndShowDetails(idText);
+    private void handleAddMovie() {
+        showMovieForm(null, false);
+    }
+
+    @FXML
+    private void handleEditMovie() {
+        Movie selectedMovie = moviesTable.getSelectionModel().getSelectedItem();
+        showMovieForm(selectedMovie, true);
+    }
+
+    private void showMovieForm(Movie movie, boolean isEdit) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/MovieFormVIew.fxml"));
+            Stage stage = new Stage();
+            stage.initModality(Modality.APPLICATION_MODAL);
+            stage.setTitle(isEdit ? "Editar Filme" : "Adicionar Novo Filme");
+            Scene scene = new Scene(loader.load());
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+            stage.setScene(scene);
+
+            MovieFormController controller = loader.getController();
+            controller.prepareForm(movie, isEdit);
+            controller.setDialogStage(stage);
+
+            stage.showAndWait();
+
+            loadMovies();
+        } catch (IOException e) {
+            System.err.println("Erro ao abrir formulário de filme: " + e.getMessage());
+            showErrorAlert("Não foi possível abrir o formulário de filme.");
+        }
     }
 
     private void fetchAndShowDetails(String movieId) {
@@ -157,9 +195,7 @@ public class UserMovieController {
             }
             try {
                 JSONObject response = new JSONObject(responseJson);
-                String status = response.getString("status");
-
-                if ("200".equals(status)) {
+                if ("200".equals(response.getString("status"))) {
                     Movie detailedMovie = Movie.fromJson(response.getJSONObject("filme"));
                     JSONArray reviewsArray = response.getJSONArray("reviews");
                     showDetailsWindow(detailedMovie, reviewsArray);
@@ -174,10 +210,18 @@ public class UserMovieController {
 
         loadDetailsTask.setOnFailed(event -> Platform.runLater(() -> showErrorAlert("Falha na tarefa de buscar detalhes.")));
 
-
         new Thread(loadDetailsTask).start();
     }
 
+    @FXML
+    private void handleSearchById() {
+        String idText = searchIdField.getText().trim();
+        if (!idText.matches("\\d+")) {
+            showErrorAlert("Por favor, digite um ID numérico válido.");
+            return;
+        }
+        fetchAndShowDetails(idText);
+    }
 
     private void showDetailsWindow(Movie movie, JSONArray reviewsArray) {
         try {
@@ -194,15 +238,69 @@ public class UserMovieController {
 
             stage.showAndWait();
         } catch (IOException e) {
-            System.err.println("Erro ao abrir a tela de detalhes: " + e.getMessage());
+            System.err.println("Erro ao abrir detalhes do filme: " + e.getMessage());
             showErrorAlert("Não foi possível abrir a tela de detalhes.");
         }
     }
 
+    @FXML
+    private void handleDeleteMovie() {
+        Movie selectedMovie = moviesTable.getSelectionModel().getSelectedItem();
+        if (selectedMovie == null) return;
+
+        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmation.setTitle("Confirmar Exclusão");
+        confirmation.setHeaderText("Tem certeza que deseja excluir o filme '" + selectedMovie.getTitulo() + "'?");
+        confirmation.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+        confirmation.getDialogPane().getStyleClass().add("root");
+
+        Optional<ButtonType> result = confirmation.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            Task<String> deleteTask = new Task<>() {
+                @Override
+                protected String call() {
+                    String token = SessionManager.getInstance().getToken();
+                    return ServerConnection.getInstance().deleteMovie(token, String.valueOf(selectedMovie.getId()));
+                }
+            };
+
+            deleteTask.setOnSucceeded(e -> {
+                String responseJson = deleteTask.getValue();
+                if (responseJson == null) {
+                    showErrorAlert("Erro de comunicação ao excluir filme.");
+                    return;
+                }
+                try {
+                    JSONObject response = new JSONObject(responseJson);
+                    String status = response.getString("status");
+                    if ("200".equals(status)) {
+                        Platform.runLater(() -> {
+                            showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Filme excluído com sucesso.");
+                            loadMovies();
+                        });
+                    } else {
+                        String finalMessage = response.optString("mensagem", "Erro ao excluir filme.");
+                        Platform.runLater(() -> showErrorAlert(finalMessage));
+                    }
+                } catch (Exception ex) {
+                    Platform.runLater(() -> showErrorAlert("Erro ao processar resposta da exclusão: " + ex.getMessage()));
+                }
+            });
+
+            deleteTask.setOnFailed(event -> Platform.runLater(() -> showErrorAlert("Falha na tarefa de excluir filme.")));
+
+            new Thread(deleteTask).start();
+        }
+    }
+
     private void showErrorAlert(String message) {
+        showAlert(Alert.AlertType.ERROR, "Erro", message);
+    }
+
+    private void showAlert(Alert.AlertType type, String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Erro");
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(message);
             alert.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());

@@ -11,7 +11,7 @@ import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
 import network.ServerConnection;
 import session.SessionManager;
-// import util.TokenDecoder; // Não é mais usado para role
+// Não há mais TokenDecoder nem lógica de Role
 
 import java.io.IOException;
 import java.util.Objects;
@@ -26,40 +26,36 @@ public class MainController {
 
     @FXML
     private void initialize() {
-        // Pega o Role que o LoginController salvou
-        String role = SessionManager.getInstance().getRole();
+        // String role = SessionManager.getInstance().getRole(); // <-- REMOVIDO
 
         try {
+            // Carrega Aba Perfil
             profileTab.setContent(FXMLLoader.load(Objects.requireNonNull(getClass().getResource("/view/ProfileView.fxml"))));
 
-            if ("admin".equals(role)) {
-                moviesTab.setText("Gerenciar Filmes");
-                MovieManagementController movieController = (MovieManagementController) getControllerForTab(moviesTab, "/view/MovieManagementView.fxml");
-                moviesTab.setOnSelectionChanged(event -> {
-                    if (moviesTab.isSelected() && movieController != null) movieController.loadMovies();
-                });
+            // --- LÓGICA DE ROLE REMOVIDA ---
+            // Carrega todas as abas para todos os usuários.
+            // O servidor cuidará de rejeitar ações não autorizadas.
 
-                UserManagementController userController = (UserManagementController) getControllerForTab(userManagementTab, "/view/UserManagementView.fxml");
-                userManagementTab.setOnSelectionChanged(event -> {
-                    if (userManagementTab.isSelected() && userController != null) userController.loadUsers();
-                });
+            // Carrega Aba Filmes (usando os arquivos unificados)
+            moviesTab.setText("Filmes");
+            MoviesController movieController = (MoviesController) getControllerForTab(moviesTab, "/view/MoviesView.fxml");
+            moviesTab.setOnSelectionChanged(event -> {
+                if (moviesTab.isSelected() && movieController != null) movieController.loadMovies();
+            });
 
-                mainTabPane.getTabs().remove(myReviewsTab);
+            // Carrega Aba Minhas Avaliações
+            MyReviewsController reviewsController = (MyReviewsController) getControllerForTab(myReviewsTab, "/view/MyReviewsView.fxml");
+            myReviewsTab.setOnSelectionChanged(event -> {
+                if (myReviewsTab.isSelected() && reviewsController != null) reviewsController.loadAndShowReviews();
+            });
 
-            } else {
-                moviesTab.setText("Ver Filmes");
-                UserMovieController movieController = (UserMovieController) getControllerForTab(moviesTab, "/view/UserMovieView.fxml");
-                moviesTab.setOnSelectionChanged(event -> {
-                    if (moviesTab.isSelected() && movieController != null) movieController.loadMovies();
-                });
+            // Carrega Aba Gerenciar Usuários
+            UserManagementController userController = (UserManagementController) getControllerForTab(userManagementTab, "/view/UserManagementView.fxml");
+            userManagementTab.setOnSelectionChanged(event -> {
+                if (userManagementTab.isSelected() && userController != null) userController.loadUsers();
+            });
 
-                MyReviewsController reviewsController = (MyReviewsController) getControllerForTab(myReviewsTab, "/view/MyReviewsView.fxml");
-                myReviewsTab.setOnSelectionChanged(event -> {
-                    if (myReviewsTab.isSelected() && reviewsController != null) reviewsController.loadAndShowReviews();
-                });
-
-                mainTabPane.getTabs().remove(userManagementTab);
-            }
+            // Nenhuma aba é removida.
 
             mainTabPane.getSelectionModel().select(profileTab);
 
