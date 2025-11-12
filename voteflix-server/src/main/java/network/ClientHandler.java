@@ -647,6 +647,7 @@ public class ClientHandler {
                 password == null || password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
     }
 
+    // --- MÉTODO CORRIGIDO ---
     // Modificado para aceitar List<String> e validar
     private boolean isInvalidMovieFields(JSONObject movieJson, List<String> generos) {
         if (movieJson == null) return true;
@@ -655,15 +656,39 @@ public class ClientHandler {
         String sinopse = movieJson.optString("sinopse");
         String diretor = movieJson.optString("diretor");
 
-        if (titulo.isEmpty() || titulo.length() > 30 ||
-                !ano.matches("\\d{4}") ||
-                sinopse.length() > 250 ||
-                diretor.isEmpty() ||
-                generos == null || generos.isEmpty()) {
+        // --- VALIDAÇÕES ATUALIZADAS ---
+
+        // Título: (min: 3) (max: 30)
+        if (titulo == null || titulo.length() < 3 || titulo.length() > 30) {
             return true;
         }
 
-        // Nova validação: checa se todos os gêneros recebidos estão na lista pré-definida
+        // Ano: (min: 3) (max: 4) (apenas dígitos)
+        // A regex \\d{3,4} verifica se há "entre 3 e 4" dígitos.
+        if (ano == null || !ano.matches("\\d{3,4}")) {
+            return true;
+        }
+
+        // Diretor: (min: 3) (max: 30)
+        if (diretor == null || diretor.length() < 3 || diretor.length() > 30) {
+            return true;
+        }
+
+        // Sinopse: (max: 250)
+        if (sinopse == null || sinopse.length() > 250) {
+            // Permite sinopse nula ou vazia, mas não maior que 250.
+            if(sinopse != null) return true;
+        }
+
+        // Gêneros: (pelo menos um)
+        if (generos == null || generos.isEmpty()) {
+            return true;
+        }
+
+        // --- FIM DAS VALIDAÇÕES ---
+
+
+        // Validação de gêneros pré-definidos (já estava correta)
         for (String g : generos) {
             if (!PREDEFINED_GENRES.contains(g)) {
                 return true; // Encontrou um gênero inválido
@@ -672,6 +697,7 @@ public class ClientHandler {
 
         return false;
     }
+    // --- FIM DO MÉTODO CORRIGIDO ---
 
     // Adicionado Helper para converter JSONArray para List<String>
     private List<String> jsonArrayToList(JSONArray jsonArray) {

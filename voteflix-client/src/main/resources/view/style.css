@@ -150,6 +150,14 @@
     -fx-faint-focus-color: transparent;
 }
 
+/* --- CORREÇÃO DO FUNDO BRANCO --- */
+/* Define a cor de fundo da barra de cabeçalho das abas */
+#mainTabPane .tab-header-background {
+    -fx-background-color: #141414;
+}
+/* --- FIM DA CORREÇÃO --- */
+
+
 /* Estilo base para CADA aba (selecionada ou não) */
 #mainTabPane .tab {
     -fx-background-color: #222222;
@@ -162,7 +170,7 @@
 #mainTabPane .tab .label {
     -fx-font-weight: bold;
     -fx-text-fill: #FFFFFF;
-    -fx-opacity: 1.0; /* <-- CORREÇÃO PRINCIPAL */
+    -fx-opacity: 1.0; /* <-- CORREÇÃO PRINCIPAL (Texto Esmaecido) */
 }
 
 /* Estilo da aba SELECIONADA (agora sem o foco azul) */
