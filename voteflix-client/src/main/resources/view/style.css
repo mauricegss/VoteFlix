@@ -142,38 +142,48 @@
 }
 
 
-.tab-pane {
-    -fx-background-color: #141414;
-}
-.tab-pane .tab-header-area {
-    -fx-background-color: #141414;
-    -fx-padding: 0;
-}
-.tab-pane .tab-header-area .tab-header-background {
-    -fx-background-color: #141414;
+/* --- REGRAS DAS ABAS ATUALIZADAS --- */
+
+/* Remove o anel de foco azul padrão */
+#mainTabPane:focused {
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
 }
 
-.tab-pane .tab {
+/* Estilo base para CADA aba (selecionada ou não) */
+#mainTabPane .tab {
     -fx-background-color: #222222;
     -fx-padding: 12px 25px;
     -fx-background-insets: 0;
     -fx-background-radius: 4px 4px 0 0;
 }
-.tab-pane .tab .label {
+
+/* Estilo para o TEXTO em CADA aba */
+#mainTabPane .tab .label {
     -fx-font-weight: bold;
     -fx-text-fill: #FFFFFF;
+    -fx-opacity: 1.0; /* <-- CORREÇÃO PRINCIPAL */
 }
-.tab-pane .tab:selected {
+
+/* Estilo da aba SELECIONADA (agora sem o foco azul) */
+#mainTabPane .tab:selected {
     -fx-background-color: #141414;
-    -fx-border-color: #E50914;
+    -fx-border-color: #E50914; /* A borda vermelha */
     -fx-border-width: 3px 0 0 0;
 }
-.tab-pane .tab:hover .label {
+
+/* Mantém o texto branco no hover */
+#mainTabPane .tab:hover .label {
     -fx-text-fill: #FFFFFF;
 }
-.tab-pane .tab:selected .label {
+
+/* Mantém o texto branco na seleção */
+#mainTabPane .tab:selected .label {
     -fx-text-fill: #FFFFFF;
 }
+
+/* --- FIM DAS REGRAS DAS ABAS --- */
+
 .tab-pane .tab-content-area {
     -fx-background-color: #141414;
 }

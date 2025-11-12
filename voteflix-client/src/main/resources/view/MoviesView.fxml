@@ -26,7 +26,6 @@
         </VBox>
     </top>
     <center>
-
         <TableView fx:id="moviesTable" prefHeight="200.0" prefWidth="200.0" BorderPane.alignment="CENTER">
             <columns>
                 <TableColumn fx:id="idColumn" prefWidth="50.0" text="ID" styleClass="id-column" />
@@ -36,10 +35,9 @@
                 />
                 <TableColumn fx:id="genresColumn" prefWidth="150.0" text="Gêneros" />
                 <TableColumn fx:id="ratingColumn" prefWidth="70.0" text="Nota" styleClass="rating-column" />
-                <TableColumn fx:id="actionsColumn" prefWidth="120.0" text="Ações" styleClass="actions-column" />
+                <TableColumn fx:id="actionsColumn" prefWidth="150.0" text="Ações" styleClass="actions-column" />
             </columns>
             <columnResizePolicy>
-
                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
             </columnResizePolicy>
         </TableView>

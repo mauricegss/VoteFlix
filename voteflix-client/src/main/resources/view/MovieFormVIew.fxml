@@ -6,6 +6,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -20,6 +21,11 @@
         </VBox.margin>
     </Label>
     <GridPane styleClass="form-grid">
+        <columnConstraints>
+            <ColumnConstraints hgrow="NEVER" minWidth="100.0" />
+            <ColumnConstraints hgrow="ALWAYS" />
+        </columnConstraints>
+
         <Label text="Título:" GridPane.rowIndex="0" />
         <TextField fx:id="titleField" GridPane.columnIndex="1" GridPane.rowIndex="0" />
 
