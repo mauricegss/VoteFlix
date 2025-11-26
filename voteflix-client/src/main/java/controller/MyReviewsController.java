@@ -88,8 +88,6 @@ public class MyReviewsController {
                             review.setDescricao(rJson.optString("descricao"));
                             review.setData(rJson.optString("data"));
                             review.setNomeUsuario(rJson.optString("nome_usuario"));
-
-                            // Lógica do Editado (Corrige o erro de cannot find symbol se Review estiver atualizado)
                             review.setEditado(rJson.optString("editado", "false"));
 
                             userReviewsList.add(review);
@@ -150,7 +148,6 @@ public class MyReviewsController {
                     setText(null);
                     setGraphic(null);
                 } else {
-                    // Refatorado: Uso do método extraído para limpar o código e remover o aviso
                     reviewTextLabel.setText(formatReviewDisplay(review));
                     setGraphic(hbox);
                 }
@@ -158,7 +155,6 @@ public class MyReviewsController {
         });
     }
 
-    // --- Método Extraído para resolver o aviso "long surrounding method" ---
     private String formatReviewDisplay(Review review) {
         String editedSuffix = "true".equalsIgnoreCase(review.getEditado()) ? " (Editado)" : "";
 
@@ -261,6 +257,7 @@ public class MyReviewsController {
                 try {
                     JSONObject response = new JSONObject(responseJson);
                     if ("200".equals(response.getString("status"))) {
+                        showAlert(Alert.AlertType.INFORMATION, "Sucesso", response.getString("mensagem"));
                         loadAndShowReviews();
                     } else {
                         showErrorAlert(response.optString("mensagem", "Erro ao excluir."));
@@ -288,9 +285,13 @@ public class MyReviewsController {
     }
 
     private void showErrorAlert(String message) {
+        showAlert(Alert.AlertType.ERROR, "Erro", message);
+    }
+
+    private void showAlert(Alert.AlertType type, String title, String message) {
         Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Erro");
+            Alert alert = new Alert(type);
+            alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(message);
             try {

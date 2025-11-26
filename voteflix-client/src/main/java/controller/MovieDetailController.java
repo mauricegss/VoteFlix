@@ -153,24 +153,20 @@ public class MovieDetailController {
                 } else {
                     reviewTextLabel.setText(formatReviewDisplay(review));
 
-                    // --- LÓGICA ATUALIZADA ---
-                    // Verifica se a review pertence ao usuário logado
-                    boolean isOwner = review.isOwnReview();
+                    // Botões sempre visíveis para o usuário tentar interagir
+                    boolean canInteract = true;
 
-                    // Aplica a visibilidade para AMBOS os botões
-                    editButton.setVisible(isOwner);
-                    editButton.setManaged(isOwner);
-
-                    deleteButton.setVisible(isOwner);
-                    deleteButton.setManaged(isOwner);
-                    // -------------------------
+                    editButton.setVisible(canInteract);
+                    editButton.setManaged(canInteract);
+                    deleteButton.setVisible(canInteract);
+                    deleteButton.setManaged(canInteract);
 
                     setGraphic(hbox);
                 }
             }
         });
     }
-    
+
     private String formatReviewDisplay(Review review) {
         String editedSuffix = "true".equalsIgnoreCase(review.getEditado()) ? " (Editado)" : "";
 
@@ -242,7 +238,8 @@ public class MovieDetailController {
                     JSONObject response = new JSONObject(responseJson);
                     String status = response.getString("status");
                     if ("200".equals(status)) {
-                        showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Avaliação excluída com sucesso.");
+                        // --- CORREÇÃO AQUI ---
+                        showAlert(Alert.AlertType.INFORMATION, "Sucesso", response.getString("mensagem"));
                         refreshReviews();
                     } else {
                         String finalMessage = response.optString("mensagem", "Erro ao excluir avaliação.");

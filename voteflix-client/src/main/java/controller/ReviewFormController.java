@@ -32,7 +32,6 @@ public class ReviewFormController {
     private Review existingReview;
     private boolean isEditMode = false;
 
-    // Controladores que podem precisar de atualização após salvar
     private MovieDetailController detailController;
     private MyReviewsController myReviewsController;
 
@@ -50,7 +49,6 @@ public class ReviewFormController {
         this.detailController = detailController;
     }
 
-    // Novo setter para o controlador de Minhas Avaliações
     public void setMyReviewsController(MyReviewsController myReviewsController) {
         this.myReviewsController = myReviewsController;
     }
@@ -61,7 +59,6 @@ public class ReviewFormController {
         this.isEditMode = (review != null);
 
         titleLabel.setText(isEditMode ? "Editar Avaliação" : "Adicionar Avaliação");
-        // Garante que não quebre se o filme for nulo (embora deva ser passado)
         String movieName = (movie != null) ? movie.getTitulo() : "Desconhecido";
         movieTitleLabel.setText("Filme: " + movieName);
 
@@ -90,7 +87,6 @@ public class ReviewFormController {
             protected String call() {
                 String token = SessionManager.getInstance().getToken();
                 if (isEditMode) {
-                    // Protocolo já existente no ServerConnection
                     return ServerConnection.getInstance().editReview(
                             token,
                             String.valueOf(existingReview.getId()),
@@ -123,9 +119,10 @@ public class ReviewFormController {
                 String status = response.getString("status");
 
                 if ("200".equals(status) || "201".equals(status)) {
-                    showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Avaliação salva com sucesso.");
+                    // --- CORREÇÃO AQUI ---
+                    // Usa a mensagem vinda do servidor (ex: "Sucesso: Operação realizada...")
+                    showAlert(Alert.AlertType.INFORMATION, "Sucesso", response.getString("mensagem"));
 
-                    // Atualiza quem chamou o formulário
                     if (detailController != null) {
                         detailController.refreshReviews();
                     }
@@ -135,8 +132,11 @@ public class ReviewFormController {
 
                     dialogStage.close();
                 } else {
+                    // O servidor pode mandar mensagens como "Erro: Você não tem permissão..."
                     String finalMessage = response.optString("mensagem", "Erro ao salvar avaliação.");
                     statusLabel.setText(finalMessage);
+                    // Opcional: mostrar alerta se quiser forçar o popup
+                    // showAlert(Alert.AlertType.ERROR, "Erro", finalMessage);
                 }
             } catch (Exception ex) {
                 showAlert(Alert.AlertType.ERROR, "Erro", "Erro ao processar resposta do servidor: " + ex.getMessage());
