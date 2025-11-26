@@ -495,6 +495,7 @@ public class ClientHandler {
         }
     }
 
+    // --- MÉTODO ALTERADO ---
     private String handleEditReview(JSONObject request, int userId, String role) {
         if (!"user".equals(role)) {
             return createErrorResponse(403);
@@ -516,16 +517,22 @@ public class ClientHandler {
                 return createErrorResponse(422);
             }
 
-            Review reviewToUpdate = reviewDAO.findByIdAndUserId(reviewId, userId);
+            // 1. Busca a review independente do usuário
+            Review reviewToUpdate = reviewDAO.findById(reviewId);
+
+            // 2. Se não existir, retorna 404
             if (reviewToUpdate == null) {
                 return createErrorResponse(404);
             }
 
+            // 3. Se existir, mas não for do usuário logado, retorna 403
+            if (reviewToUpdate.getIdUsuario() != userId) {
+                return createErrorResponse(403, "Você não tem permissão para editar esta avaliação.");
+            }
 
             reviewToUpdate.setNota(nota);
             reviewToUpdate.setTitulo(titulo);
             reviewToUpdate.setDescricao(descricao);
-
 
             if (reviewDAO.updateReview(reviewToUpdate)) {
                 return createSuccessResponse("200").toString();
@@ -540,6 +547,7 @@ public class ClientHandler {
             return createErrorResponse(400);
         }
     }
+    // -----------------------
 
     private String handleDeleteReview(JSONObject request, int userId, String role) {
         try {
@@ -731,10 +739,7 @@ public class ClientHandler {
         reviewJson.put("titulo", review.getTitulo() != null ? review.getTitulo() : "");
         reviewJson.put("descricao", review.getDescricao() != null ? review.getDescricao() : "");
         reviewJson.put("data", review.getData() != null ? review.getData() : "");
-
-        // Inclui o status de edição no JSON de resposta
         reviewJson.put("editado", review.getEditado() != null ? review.getEditado() : "false");
-
         return reviewJson;
     }
 

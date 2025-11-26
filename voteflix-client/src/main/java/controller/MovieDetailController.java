@@ -151,24 +151,26 @@ public class MovieDetailController {
                     setText(null);
                     setGraphic(null);
                 } else {
-                    // Refatorado: Lógica de formatação extraída
                     reviewTextLabel.setText(formatReviewDisplay(review));
 
-                    boolean canEdit = review.isOwnReview();
-                    boolean canDelete = true;
+                    // --- LÓGICA ATUALIZADA ---
+                    // Verifica se a review pertence ao usuário logado
+                    boolean isOwner = review.isOwnReview();
 
-                    editButton.setVisible(canEdit);
-                    editButton.setManaged(canEdit);
-                    deleteButton.setVisible(canDelete);
-                    deleteButton.setManaged(canDelete);
+                    // Aplica a visibilidade para AMBOS os botões
+                    editButton.setVisible(isOwner);
+                    editButton.setManaged(isOwner);
+
+                    deleteButton.setVisible(isOwner);
+                    deleteButton.setManaged(isOwner);
+                    // -------------------------
 
                     setGraphic(hbox);
                 }
             }
         });
     }
-
-    // --- Método Extraído (Refatoração Solicitada) ---
+    
     private String formatReviewDisplay(Review review) {
         String editedSuffix = "true".equalsIgnoreCase(review.getEditado()) ? " (Editado)" : "";
 
