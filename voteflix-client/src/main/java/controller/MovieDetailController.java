@@ -23,7 +23,6 @@ import network.ServerConnection;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import session.SessionManager;
-// Não há mais TokenDecoder nem lógica de Role
 
 import java.io.IOException;
 import java.util.Objects;
@@ -44,12 +43,9 @@ public class MovieDetailController {
     private Movie currentMovie;
     private final ObservableList<Review> currentReviews = FXCollections.observableArrayList();
     private Review userExistingReview = null;
-    // As variáveis de 'role' e 'userId' foram completamente removidas.
 
     @FXML
     private void initialize() {
-        // A lógica de pegar 'role' e 'userId' foi removida.
-
         synopsisText.getStyleClass().add("synopsis-text");
         synopsisText.setStyle("-fx-fill: #E0E0E0;");
 
@@ -57,8 +53,6 @@ public class MovieDetailController {
         reviewsListView.setItems(currentReviews);
         reviewsListView.setPlaceholder(new Label("Carregando avaliações..."));
 
-        // O botão de adicionar/editar review agora é visível para todos.
-        // O servidor vai barrar o 'admin' se ele tentar usar.
         reviewActionBox.setVisible(true);
         reviewActionBox.setManaged(true);
     }
@@ -81,16 +75,13 @@ public class MovieDetailController {
                     Review review = parseReviewFromJson(reviewJson);
                     currentReviews.add(review);
 
-                    // Verifica o campo booleano 'isOwnReview' que o servidor enviou
                     if (review.isOwnReview()) {
                         userExistingReview = review;
                     }
                 }
             }
 
-            // O texto do botão muda se o servidor nos disse que temos uma review
             addEditReviewButton.setText(userExistingReview != null ? "Editar Minha Avaliação" : "Adicionar Avaliação");
-
 
             if (currentReviews.isEmpty()) {
                 reviewsListView.setPlaceholder(new Label("Ainda não há avaliações para este filme."));
@@ -105,7 +96,6 @@ public class MovieDetailController {
         ratingLabel.setText(String.format("Nota: %.1f/5.0 (%d avaliações)", nota, qtdAvaliacoes));
     }
 
-
     private Review parseReviewFromJson(JSONObject json) {
         Review review = new Review();
         review.setId(json.optInt("id", 0));
@@ -116,8 +106,8 @@ public class MovieDetailController {
         review.setTitulo(json.optString("titulo", ""));
         review.setDescricao(json.optString("descricao", ""));
         review.setData(json.optString("data", ""));
-        // Pega o campo booleano que o servidor enviou
         review.setOwnReview(json.optBoolean("isOwnReview", false));
+        review.setEditado(json.optString("editado", "false"));
         return review;
     }
 
@@ -145,16 +135,12 @@ public class MovieDetailController {
 
                 editButton.setOnAction(event -> {
                     Review review = getItem();
-                    if (review != null) {
-                        openReviewForm(review);
-                    }
+                    if (review != null) openReviewForm(review);
                 });
 
                 deleteButton.setOnAction(event -> {
                     Review review = getItem();
-                    if (review != null) {
-                        handleDeleteReview(review);
-                    }
+                    if (review != null) handleDeleteReview(review);
                 });
             }
 
@@ -165,24 +151,10 @@ public class MovieDetailController {
                     setText(null);
                     setGraphic(null);
                 } else {
-                    String reviewDisplay = String.format("[%d★] %s (%s - %s)\n%s",
-                            review.getNota(),
-                            review.getTitulo().isEmpty() ? "(Sem Título)" : review.getTitulo(),
-                            review.getNomeUsuario(),
-                            review.getData(),
-                            review.getDescricao()
-                    );
-                    reviewTextLabel.setText(reviewDisplay);
+                    // Refatorado: Lógica de formatação extraída
+                    reviewTextLabel.setText(formatReviewDisplay(review));
 
-                    // --- LÓGICA DE UI CORRIGIDA ---
-                    // Pega o booleano 'isOwnReview' que o servidor enviou
-
-                    // Mostra o botão "Editar" APENAS se o servidor disse que a review é sua
                     boolean canEdit = review.isOwnReview();
-
-                    // Mostra o botão "Excluir" para TODOS.
-                    // O servidor vai validar se o usuário (pelo token) pode ou não
-                    // deletar esta review específica.
                     boolean canDelete = true;
 
                     editButton.setVisible(canEdit);
@@ -196,10 +168,22 @@ public class MovieDetailController {
         });
     }
 
+    // --- Método Extraído (Refatoração Solicitada) ---
+    private String formatReviewDisplay(Review review) {
+        String editedSuffix = "true".equalsIgnoreCase(review.getEditado()) ? " (Editado)" : "";
+
+        return String.format("[%d★] %s (%s - %s)%s\n%s",
+                review.getNota(),
+                (review.getTitulo() == null || review.getTitulo().isEmpty()) ? "(Sem Título)" : review.getTitulo(),
+                review.getNomeUsuario(),
+                review.getData(),
+                editedSuffix,
+                review.getDescricao()
+        );
+    }
+
     @FXML
     private void handleAddEditReview() {
-        // 'userExistingReview' é nulo ou a review,
-        // com base no campo 'isOwnReview' do servidor.
         openReviewForm(userExistingReview);
     }
 
@@ -225,7 +209,6 @@ public class MovieDetailController {
             showErrorAlert("Não foi possível abrir o formulário de avaliação.");
         }
     }
-
 
     private void handleDeleteReview(Review review) {
         Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);

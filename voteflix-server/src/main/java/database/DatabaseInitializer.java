@@ -35,6 +35,7 @@ public class DatabaseInitializer {
                 + "titulo TEXT,"
                 + "descricao TEXT,"
                 + "data TEXT,"
+                + "editado TEXT DEFAULT 'false',"
                 + "FOREIGN KEY (id_filme) REFERENCES filmes(id) ON DELETE CASCADE,"
                 + "FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE,"
                 + "UNIQUE(id_filme, id_usuario)"
@@ -42,39 +43,46 @@ public class DatabaseInitializer {
 
         String createAdminUserSql = "INSERT OR IGNORE INTO usuarios (nome, senha) VALUES ('admin', 'admin');";
 
-        String checkColumnSql = "PRAGMA table_info(reviews);";
-
         try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(createUserTableSql);
             stmt.execute(createMovieTableSql);
+            stmt.execute(createReviewTableSql);
 
-            boolean columnExists = false;
-            try (ResultSet rs = stmt.executeQuery(checkColumnSql)) {
-                while (rs.next()) {
-                    if ("id_usuario".equalsIgnoreCase(rs.getString("name"))) {
-                        columnExists = true;
-                        break;
-                    }
-                }
-            } catch (SQLException e) {
-                if (!e.getMessage().contains("no such table: reviews")) {
-                    System.err.println("Erro ao verificar colunas da tabela reviews: " + e.getMessage());
-                }
-            }
-
-            if (!columnExists) {
-                stmt.execute(createReviewTableSql);
-                System.out.println("Tabela 'reviews' criada ou verificada.");
-            } else {
-                System.out.println("Tabela 'reviews' já existe com a coluna 'id_usuario'.");
-            }
-
+            // Migração de dados para tabelas existentes
+            checkAndAddColumnToReviews(stmt, "id_usuario", "INTEGER NOT NULL DEFAULT 0");
+            checkAndAddColumnToReviews(stmt, "editado", "TEXT DEFAULT 'false'");
 
             stmt.execute(createAdminUserSql);
 
         } catch (SQLException e) {
             System.err.println("Erro ao inicializar o banco de dados: " + e.getMessage());
+        }
+    }
+
+    // Refatorado: Específico para tabela 'reviews' para evitar warning de parâmetro
+    private static void checkAndAddColumnToReviews(Statement stmt, String columnName, String columnType) {
+        String tableName = "reviews";
+        String checkColumnSql = "PRAGMA table_info(" + tableName + ");";
+        boolean columnExists = false;
+        try (ResultSet rs = stmt.executeQuery(checkColumnSql)) {
+            while (rs.next()) {
+                if (columnName.equalsIgnoreCase(rs.getString("name"))) {
+                    columnExists = true;
+                    break;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao verificar coluna " + columnName + ": " + e.getMessage());
+        }
+
+        if (!columnExists) {
+            try {
+                stmt.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnType);
+                System.out.println("Coluna '" + columnName + "' adicionada à tabela '" + tableName + "'.");
+            } catch (SQLException e) {
+                System.err.println("Erro ao adicionar coluna " + columnName + ": " + e.getMessage());
+            }
         }
     }
 }

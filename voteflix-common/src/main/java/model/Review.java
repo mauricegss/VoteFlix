@@ -13,7 +13,10 @@ public class Review implements Serializable {
     private int nota;
     private String data;
 
-    // CAMPO ADICIONADO (não é um campo do DB, é enviado pelo servidor)
+    // Novo campo para persistência
+    private String editado;
+
+    // Campo auxiliar de UI (não persistido no banco, mas enviado pelo JSON)
     private boolean isOwnReview;
 
     public Review() {
@@ -83,8 +86,15 @@ public class Review implements Serializable {
         this.data = data;
     }
 
-    // --- MÉTODOS ADICIONADOS ---
-    // (Estes são os métodos que estavam faltando)
+    // --- Novos Getters e Setters (Resolvem o "cannot find symbol") ---
+
+    public String getEditado() {
+        return editado;
+    }
+
+    public void setEditado(String editado) {
+        this.editado = editado;
+    }
 
     public boolean isOwnReview() {
         return isOwnReview;
@@ -93,5 +103,4 @@ public class Review implements Serializable {
     public void setOwnReview(boolean ownReview) {
         isOwnReview = ownReview;
     }
-    // ---------------------------
 }

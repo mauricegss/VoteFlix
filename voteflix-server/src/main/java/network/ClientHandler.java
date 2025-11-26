@@ -22,14 +22,14 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays; // Adicionado
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet; // Adicionado
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set; // Adicionado
+import java.util.Set;
 
 public class ClientHandler {
     private final SocketChannel channel;
@@ -60,7 +60,6 @@ public class ClientHandler {
         RESPONSE_MESSAGES.put("500", "Erro: Falha interna do servidor");
     }
 
-    // Adicionada lista de gêneros permitidos
     private static final Set<String> PREDEFINED_GENRES = new HashSet<>(Arrays.asList(
             "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Ficção Científica",
             "Terror", "Romance", "Documentário", "Musical", "Animação"
@@ -343,12 +342,12 @@ public class ClientHandler {
     private String handleCreateMovie(JSONObject request) {
         try {
             JSONObject movieJson = request.getJSONObject("filme");
-            List<String> receivedGenres = jsonArrayToList(movieJson.optJSONArray("genero")); // Modificado
+            List<String> receivedGenres = jsonArrayToList(movieJson.optJSONArray("genero"));
 
-            if (isInvalidMovieFields(movieJson, receivedGenres)) { // Modificado
+            if (isInvalidMovieFields(movieJson, receivedGenres)) {
                 return createErrorResponse(422);
             }
-            Movie movie = movieFromJson(movieJson, receivedGenres); // Modificado
+            Movie movie = movieFromJson(movieJson, receivedGenres);
             movieDAO.createMovie(movie);
             return createSuccessResponse("201").toString();
         } catch (SQLException e) {
@@ -365,12 +364,12 @@ public class ClientHandler {
     private String handleUpdateMovie(JSONObject request) {
         try {
             JSONObject movieJson = request.getJSONObject("filme");
-            List<String> receivedGenres = jsonArrayToList(movieJson.optJSONArray("genero")); // Modificado
+            List<String> receivedGenres = jsonArrayToList(movieJson.optJSONArray("genero"));
 
-            if (!movieJson.has("id") || isInvalidMovieFields(movieJson, receivedGenres)) { // Modificado
+            if (!movieJson.has("id") || isInvalidMovieFields(movieJson, receivedGenres)) {
                 return createErrorResponse(422);
             }
-            Movie movie = movieFromJson(movieJson, receivedGenres); // Modificado
+            Movie movie = movieFromJson(movieJson, receivedGenres);
             if (movieDAO.updateMovie(movie)) {
                 return createSuccessResponse("200").toString();
             } else {
@@ -403,7 +402,6 @@ public class ClientHandler {
         }
     }
 
-    // Recebe o ID do usuário que está fazendo a requisição
     private String handleGetMovieById(JSONObject request, int requesterId) {
         try {
             int id = Integer.parseInt(request.getString("id_filme"));
@@ -416,7 +414,6 @@ public class ClientHandler {
             for (Review review : reviews) {
                 JSONObject reviewJson = jsonFromReview(review);
 
-                // Adiciona o campo booleano 'isOwnReview'
                 boolean isOwner = (requesterId == review.getIdUsuario());
                 reviewJson.put("isOwnReview", isOwner);
 
@@ -425,7 +422,7 @@ public class ClientHandler {
 
             JSONObject response = createSuccessResponse("200");
             response.put("filme", jsonFromMovie(movie));
-            response.put("reviews", reviewsJson); // Agora as reviews têm o campo 'isOwnReview'
+            response.put("reviews", reviewsJson);
             return response.toString();
         } catch (NumberFormatException | JSONException e) {
             return createErrorResponse(400);
@@ -487,8 +484,6 @@ public class ClientHandler {
             List<Review> reviews = reviewDAO.findReviewsByUserId(userId);
             JSONArray reviewsJson = new JSONArray();
             for (Review review : reviews) {
-                // Aqui não precisa do 'isOwnReview' porque
-                // o usuário só está vendo as próprias reviews.
                 reviewsJson.put(jsonFromReview(review));
             }
             JSONObject response = createSuccessResponse("200");
@@ -535,7 +530,6 @@ public class ClientHandler {
             if (reviewDAO.updateReview(reviewToUpdate)) {
                 return createSuccessResponse("200").toString();
             } else {
-
                 return createErrorResponse(404);
             }
 
@@ -647,8 +641,6 @@ public class ClientHandler {
                 password == null || password.length() < 3 || password.length() > 20 || !password.matches("[a-zA-Z0-9]+");
     }
 
-    // --- MÉTODO CORRIGIDO ---
-    // Modificado para aceitar List<String> e validar
     private boolean isInvalidMovieFields(JSONObject movieJson, List<String> generos) {
         if (movieJson == null) return true;
         String titulo = movieJson.optString("titulo");
@@ -656,50 +648,35 @@ public class ClientHandler {
         String sinopse = movieJson.optString("sinopse");
         String diretor = movieJson.optString("diretor");
 
-        // --- VALIDAÇÕES ATUALIZADAS ---
-
-        // Título: (min: 3) (max: 30)
         if (titulo == null || titulo.length() < 3 || titulo.length() > 30) {
             return true;
         }
 
-        // Ano: (min: 3) (max: 4) (apenas dígitos)
-        // A regex \\d{3,4} verifica se há "entre 3 e 4" dígitos.
         if (ano == null || !ano.matches("\\d{3,4}")) {
             return true;
         }
 
-        // Diretor: (min: 3) (max: 30)
         if (diretor == null || diretor.length() < 3 || diretor.length() > 30) {
             return true;
         }
 
-        // Sinopse: (max: 250)
         if (sinopse == null || sinopse.length() > 250) {
-            // Permite sinopse nula ou vazia, mas não maior que 250.
             if(sinopse != null) return true;
         }
 
-        // Gêneros: (pelo menos um)
         if (generos == null || generos.isEmpty()) {
             return true;
         }
 
-        // --- FIM DAS VALIDAÇÕES ---
-
-
-        // Validação de gêneros pré-definidos (já estava correta)
         for (String g : generos) {
             if (!PREDEFINED_GENRES.contains(g)) {
-                return true; // Encontrou um gênero inválido
+                return true;
             }
         }
 
         return false;
     }
-    // --- FIM DO MÉTODO CORRIGIDO ---
 
-    // Adicionado Helper para converter JSONArray para List<String>
     private List<String> jsonArrayToList(JSONArray jsonArray) {
         if (jsonArray == null) {
             return new ArrayList<>();
@@ -711,8 +688,6 @@ public class ClientHandler {
         return list;
     }
 
-
-    // Modificado para aceitar List<String>
     private Movie movieFromJson(JSONObject json, List<String> generos) throws JSONException{
         Movie movie = new Movie();
         movie.setId(json.optInt("id"));
@@ -720,7 +695,7 @@ public class ClientHandler {
         movie.setDiretor(json.getString("diretor"));
         movie.setAno(json.getString("ano"));
         movie.setSinopse(json.getString("sinopse"));
-        movie.setGeneros(generos); // Usa a lista já validada
+        movie.setGeneros(generos);
         return movie;
     }
 
@@ -756,8 +731,10 @@ public class ClientHandler {
         reviewJson.put("titulo", review.getTitulo() != null ? review.getTitulo() : "");
         reviewJson.put("descricao", review.getDescricao() != null ? review.getDescricao() : "");
         reviewJson.put("data", review.getData() != null ? review.getData() : "");
-        // Não adicionamos 'isOwnReview' aqui; é adicionado dinamicamente
-        // no 'handleGetMovieById'
+
+        // Inclui o status de edição no JSON de resposta
+        reviewJson.put("editado", review.getEditado() != null ? review.getEditado() : "false");
+
         return reviewJson;
     }
 

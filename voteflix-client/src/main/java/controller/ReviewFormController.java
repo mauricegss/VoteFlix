@@ -31,14 +31,16 @@ public class ReviewFormController {
     private Movie movie;
     private Review existingReview;
     private boolean isEditMode = false;
+
+    // Controladores que podem precisar de atualização após salvar
     private MovieDetailController detailController;
+    private MyReviewsController myReviewsController;
 
     @FXML
     private void initialize() {
         ratingSlider.valueProperty().addListener((obs, oldVal, newVal) ->
                 ratingValueLabel.setText(String.valueOf(newVal.intValue())));
     }
-
 
     public void setDialogStage(Stage dialogStage) {
         this.dialogStage = dialogStage;
@@ -48,6 +50,10 @@ public class ReviewFormController {
         this.detailController = detailController;
     }
 
+    // Novo setter para o controlador de Minhas Avaliações
+    public void setMyReviewsController(MyReviewsController myReviewsController) {
+        this.myReviewsController = myReviewsController;
+    }
 
     public void prepareForm(Movie movie, Review review) {
         this.movie = movie;
@@ -55,7 +61,9 @@ public class ReviewFormController {
         this.isEditMode = (review != null);
 
         titleLabel.setText(isEditMode ? "Editar Avaliação" : "Adicionar Avaliação");
-        movieTitleLabel.setText("Filme: " + movie.getTitulo());
+        // Garante que não quebre se o filme for nulo (embora deva ser passado)
+        String movieName = (movie != null) ? movie.getTitulo() : "Desconhecido";
+        movieTitleLabel.setText("Filme: " + movieName);
 
         if (isEditMode) {
             ratingSlider.setValue(existingReview.getNota());
@@ -82,6 +90,7 @@ public class ReviewFormController {
             protected String call() {
                 String token = SessionManager.getInstance().getToken();
                 if (isEditMode) {
+                    // Protocolo já existente no ServerConnection
                     return ServerConnection.getInstance().editReview(
                             token,
                             String.valueOf(existingReview.getId()),
@@ -115,9 +124,15 @@ public class ReviewFormController {
 
                 if ("200".equals(status) || "201".equals(status)) {
                     showAlert(Alert.AlertType.INFORMATION, "Sucesso", "Avaliação salva com sucesso.");
+
+                    // Atualiza quem chamou o formulário
                     if (detailController != null) {
-                        detailController.refreshReviews(); // Chama refresh no controller pai
+                        detailController.refreshReviews();
                     }
+                    if (myReviewsController != null) {
+                        myReviewsController.loadAndShowReviews();
+                    }
+
                     dialogStage.close();
                 } else {
                     String finalMessage = response.optString("mensagem", "Erro ao salvar avaliação.");

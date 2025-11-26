@@ -13,7 +13,8 @@ public class ReviewDAO {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public void createReview(Review review) throws SQLException {
-        String sql = "INSERT INTO reviews(id_filme, id_usuario, nome_usuario, nota, titulo, descricao, data) VALUES(?, ?, ?, ?, ?, ?, ?)";
+        // SQL atualizado para incluir a coluna 'editado'
+        String sql = "INSERT INTO reviews(id_filme, id_usuario, nome_usuario, nota, titulo, descricao, data, editado) VALUES(?, ?, ?, ?, ?, ?, ?, ?)";
         Connection conn = null;
         PreparedStatement pstmt = null;
         String currentDateStr = LocalDate.now().format(DATE_FORMATTER);
@@ -29,6 +30,8 @@ public class ReviewDAO {
             pstmt.setString(5, review.getTitulo());
             pstmt.setString(6, review.getDescricao());
             pstmt.setString(7, currentDateStr);
+            pstmt.setString(8, "false"); // Inicializa como false
+
             int affectedRows = pstmt.executeUpdate();
 
             if (affectedRows == 0) {
@@ -42,6 +45,7 @@ public class ReviewDAO {
                 if (generatedKeys.next()) {
                     review.setId(generatedKeys.getInt(1));
                     review.setData(currentDateStr);
+                    review.setEditado("false");
                 } else {
                     System.err.println("Aviso: Não foi possível obter o ID gerado para a nova review.");
                 }
@@ -107,7 +111,8 @@ public class ReviewDAO {
 
 
     public boolean updateReview(Review review) throws SQLException {
-        String sql = "UPDATE reviews SET nota = ?, titulo = ?, descricao = ?, data = ? WHERE id = ? AND id_usuario = ?";
+        // Atualiza editado para 'true'
+        String sql = "UPDATE reviews SET nota = ?, titulo = ?, descricao = ?, data = ?, editado = ? WHERE id = ? AND id_usuario = ?";
         Connection conn = null;
         PreparedStatement pstmt = null;
         boolean success;
@@ -121,8 +126,9 @@ public class ReviewDAO {
             pstmt.setString(2, review.getTitulo());
             pstmt.setString(3, review.getDescricao());
             pstmt.setString(4, currentDateStr);
-            pstmt.setInt(5, review.getId());
-            pstmt.setInt(6, review.getIdUsuario());
+            pstmt.setString(5, "true"); // Define como editado
+            pstmt.setInt(6, review.getId());
+            pstmt.setInt(7, review.getIdUsuario());
 
             int affectedRows = pstmt.executeUpdate();
             success = affectedRows > 0;
@@ -299,6 +305,8 @@ public class ReviewDAO {
         review.setTitulo(rs.getString("titulo"));
         review.setDescricao(rs.getString("descricao"));
         review.setData(rs.getString("data"));
+        // Mapeia o campo editado
+        review.setEditado(rs.getString("editado"));
         return review;
     }
 
