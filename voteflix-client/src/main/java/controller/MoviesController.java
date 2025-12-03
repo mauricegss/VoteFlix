@@ -8,14 +8,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.Label;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.HBox;
 import javafx.stage.Modality;
@@ -27,10 +20,12 @@ import org.json.JSONObject;
 import session.SessionManager;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
-// Nome da classe atualizado
 public class MoviesController {
 
     @FXML private TableView<Movie> moviesTable;
@@ -41,28 +36,68 @@ public class MoviesController {
     @FXML private TableColumn<Movie, String> genresColumn;
     @FXML private TableColumn<Movie, Double> ratingColumn;
     @FXML private TableColumn<Movie, Void> actionsColumn;
+
     @FXML private TextField searchIdField;
+    @FXML private ComboBox<String> genreFilterComboBox;
+
     @FXML private Button editButton;
     @FXML private Button deleteButton;
 
-    private final ObservableList<Movie> movieList = FXCollections.observableArrayList();
+    // Controles de Paginação
+    @FXML private Button prevPageButton;
+    @FXML private Button nextPageButton;
+    @FXML private Label pageLabel;
+
+    // Lista que armazena TODOS os filmes vindos do servidor
+    private final List<Movie> allMoviesMasterList = new ArrayList<>();
+
+    // Lista exibida na tabela (filtrada e paginada)
+    private final ObservableList<Movie> displayedMovies = FXCollections.observableArrayList();
+
+    // Configurações de Paginação
+    private static final int ITEMS_PER_PAGE = 5; // Pode alterar para 10 se preferir
+    private int currentPage = 1;
+    private int totalPages = 1;
 
     @FXML
     private void initialize() {
+        // Configuração das Colunas
         idColumn.setCellValueFactory(new PropertyValueFactory<>("id"));
         titleColumn.setCellValueFactory(new PropertyValueFactory<>("titulo"));
         directorColumn.setCellValueFactory(new PropertyValueFactory<>("diretor"));
         yearColumn.setCellValueFactory(new PropertyValueFactory<>("ano"));
         genresColumn.setCellValueFactory(new PropertyValueFactory<>("generosString"));
         ratingColumn.setCellValueFactory(new PropertyValueFactory<>("nota"));
+
         setupActionsColumn();
-        moviesTable.setItems(movieList);
+
+        moviesTable.setItems(displayedMovies);
         moviesTable.setPlaceholder(new Label("Carregando filmes..."));
 
+        // Listener de Seleção para botões Editar/Excluir
         moviesTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             boolean isItemSelected = newSelection != null;
             editButton.setDisable(!isItemSelected);
             deleteButton.setDisable(!isItemSelected);
+        });
+
+        // Configurar Filtro de Gêneros
+        setupGenreFilter();
+    }
+
+    private void setupGenreFilter() {
+        ObservableList<String> genres = FXCollections.observableArrayList(
+                "Todos",
+                "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Ficção Científica",
+                "Terror", "Romance", "Documentário", "Musical", "Animação"
+        );
+        genreFilterComboBox.setItems(genres);
+        genreFilterComboBox.getSelectionModel().selectFirst(); // Seleciona "Todos"
+
+        // Quando o usuário mudar o gênero, volta para página 1 e atualiza
+        genreFilterComboBox.setOnAction(event -> {
+            currentPage = 1;
+            updateTableData();
         });
     }
 
@@ -78,7 +113,7 @@ public class MoviesController {
         loadMoviesTask.setOnSucceeded(event -> {
             String responseJson = loadMoviesTask.getValue();
             Platform.runLater(() -> {
-                movieList.clear();
+                allMoviesMasterList.clear(); // Limpa a lista mestre
                 if (responseJson == null) {
                     showErrorAlert("Erro de comunicação ao carregar filmes.");
                     moviesTable.setPlaceholder(new Label("Erro ao carregar filmes."));
@@ -92,9 +127,13 @@ public class MoviesController {
                             moviesTable.setPlaceholder(new Label("Nenhum filme cadastrado no momento."));
                         } else {
                             for (int i = 0; i < movies.length(); i++) {
-                                movieList.add(Movie.fromJson(movies.getJSONObject(i)));
+                                allMoviesMasterList.add(Movie.fromJson(movies.getJSONObject(i)));
                             }
                         }
+                        // Após carregar tudo, aplica filtros e paginação
+                        currentPage = 1;
+                        updateTableData();
+
                     } else {
                         String message = response.optString("mensagem", "Não foi possível carregar os filmes.");
                         showErrorAlert(message);
@@ -113,6 +152,66 @@ public class MoviesController {
         }));
 
         new Thread(loadMoviesTask).start();
+    }
+
+    /**
+     * Filtra a lista mestre e aplica a paginação.
+     */
+    private void updateTableData() {
+        String selectedGenre = genreFilterComboBox.getValue();
+
+        // 1. Filtragem
+        List<Movie> filteredList;
+        if (selectedGenre == null || selectedGenre.equals("Todos")) {
+            filteredList = new ArrayList<>(allMoviesMasterList);
+        } else {
+            filteredList = allMoviesMasterList.stream()
+                    .filter(m -> m.getGeneros().contains(selectedGenre))
+                    .collect(Collectors.toList());
+        }
+
+        // 2. Cálculo de Paginação
+        int totalItems = filteredList.size();
+        totalPages = (int) Math.ceil((double) totalItems / ITEMS_PER_PAGE);
+        if (totalPages == 0) totalPages = 1;
+
+        // Garante que a página atual é válida
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        int fromIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        int toIndex = Math.min(fromIndex + ITEMS_PER_PAGE, totalItems);
+
+        // 3. Atualização da Tabela
+        displayedMovies.clear();
+        if (totalItems > 0) {
+            displayedMovies.addAll(filteredList.subList(fromIndex, toIndex));
+        }
+
+        // 4. Atualização dos Controles de UI
+        pageLabel.setText("Página " + currentPage + " de " + totalPages);
+        prevPageButton.setDisable(currentPage == 1);
+        nextPageButton.setDisable(currentPage == totalPages);
+
+        if (displayedMovies.isEmpty()) {
+            moviesTable.setPlaceholder(new Label("Nenhum filme encontrado para este filtro."));
+        }
+    }
+
+    @FXML
+    private void handlePrevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            updateTableData();
+        }
+    }
+
+    @FXML
+    private void handleNextPage() {
+        if (currentPage < totalPages) {
+            currentPage++;
+            updateTableData();
+        }
     }
 
     private void setupActionsColumn() {
@@ -303,8 +402,10 @@ public class MoviesController {
             alert.setTitle(title);
             alert.setHeaderText(null);
             alert.setContentText(message);
-            alert.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
-            alert.getDialogPane().getStyleClass().add("root");
+            try {
+                alert.getDialogPane().getStylesheets().add(Objects.requireNonNull(getClass().getResource("/view/style.css")).toExternalForm());
+                alert.getDialogPane().getStyleClass().add("root");
+            } catch (Exception ignored) { }
             alert.showAndWait();
         });
     }

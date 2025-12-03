@@ -92,23 +92,7 @@ public class ReviewDAO {
         }
         return reviews;
     }
-
-    public Review findByIdAndUserId(int reviewId, int userId) throws SQLException {
-        String sql = "SELECT * FROM reviews WHERE id = ? AND id_usuario = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, reviewId);
-            pstmt.setInt(2, userId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToReview(rs);
-                }
-            }
-        }
-        return null;
-    }
-
-    // --- NOVO MÉTODO ADICIONADO ---
+    
     public Review findById(int id) throws SQLException {
         String sql = "SELECT * FROM reviews WHERE id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -122,14 +106,15 @@ public class ReviewDAO {
         }
         return null;
     }
-    // -----------------------------
 
     public boolean updateReview(Review review) throws SQLException {
-        String sql = "UPDATE reviews SET nota = ?, titulo = ?, descricao = ?, data = ?, editado = ? WHERE id = ? AND id_usuario = ?";
+        // CORREÇÃO: Removemos "data = ?" do SQL para manter a data original
+        String sql = "UPDATE reviews SET nota = ?, titulo = ?, descricao = ?, editado = ? WHERE id = ? AND id_usuario = ?";
+
         Connection conn = null;
         PreparedStatement pstmt = null;
         boolean success;
-        String currentDateStr = LocalDate.now().format(DATE_FORMATTER);
+
         try {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
@@ -138,10 +123,12 @@ public class ReviewDAO {
             pstmt.setInt(1, review.getNota());
             pstmt.setString(2, review.getTitulo());
             pstmt.setString(3, review.getDescricao());
-            pstmt.setString(4, currentDateStr);
-            pstmt.setString(5, "true");
-            pstmt.setInt(6, review.getId());
-            pstmt.setInt(7, review.getIdUsuario());
+
+            // CORREÇÃO: Definimos apenas "editado" como true, sem alterar a data
+            pstmt.setString(4, "true");
+
+            pstmt.setInt(5, review.getId());
+            pstmt.setInt(6, review.getIdUsuario());
 
             int affectedRows = pstmt.executeUpdate();
             success = affectedRows > 0;
@@ -162,6 +149,7 @@ public class ReviewDAO {
         }
         return success;
     }
+    // ------------------------
 
     public boolean deleteReview(int reviewId, int userId) throws SQLException {
         String sqlSelect = "SELECT id_filme FROM reviews WHERE id = ? AND id_usuario = ?";

@@ -600,7 +600,9 @@ public class ClientHandler {
             int userId = Integer.parseInt(request.getString("id"));
             String newPassword = request.getJSONObject("usuario").getString("senha");
 
-            if (isInvalidUserFields("tempUsernameForValidation", newPassword)) {
+            // CORREÇÃO: Use uma string válida (entre 3 e 20 chars) como "validUser"
+            // ou crie um método isInvalidPassword(newPassword)
+            if (isInvalidUserFields("validUser", newPassword)) {
                 return createErrorResponse(422);
             }
 
