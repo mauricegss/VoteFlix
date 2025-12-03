@@ -456,8 +456,11 @@ public class ClientHandler {
             JSONObject reviewJson = request.getJSONObject("review");
             Review newReview = reviewFromJson(reviewJson);
 
-            if (newReview.getNota() < 1 || newReview.getNota() > 5 || (newReview.getDescricao() != null && newReview.getDescricao().length() > 250)) {
-                return createErrorResponse(422);
+            // CORREÇÃO: Adicionada validação de comprimento do Título (Min 3, Max 30)
+            if (newReview.getNota() < 1 || newReview.getNota() > 5 ||
+                    newReview.getTitulo() == null || newReview.getTitulo().length() < 3 || newReview.getTitulo().length() > 30 ||
+                    (newReview.getDescricao() != null && newReview.getDescricao().length() > 250)) {
+                return createErrorResponse(405);
             }
 
             newReview.setIdUsuario(userId);
@@ -495,7 +498,6 @@ public class ClientHandler {
         }
     }
 
-    // --- MÉTODO ALTERADO ---
     private String handleEditReview(JSONObject request, int userId, String role) {
         if (!"user".equals(role)) {
             return createErrorResponse(403);
@@ -513,8 +515,9 @@ public class ClientHandler {
             String descricao = reviewJson.optString("descricao", "");
 
 
-            if (nota < 1 || nota > 5 || descricao.length() > 250) {
-                return createErrorResponse(422);
+            // CORREÇÃO: Adicionada validação de comprimento do Título (Min 3, Max 30)
+            if (nota < 1 || nota > 5 || titulo.length() < 3 || titulo.length() > 30 || descricao.length() > 250) {
+                return createErrorResponse(405);
             }
 
             // 1. Busca a review independente do usuário
@@ -547,7 +550,6 @@ public class ClientHandler {
             return createErrorResponse(400);
         }
     }
-    // -----------------------
 
     private String handleDeleteReview(JSONObject request, int userId, String role) {
         try {
@@ -600,8 +602,8 @@ public class ClientHandler {
             int userId = Integer.parseInt(request.getString("id"));
             String newPassword = request.getJSONObject("usuario").getString("senha");
 
-            // CORREÇÃO: Use uma string válida (entre 3 e 20 chars) como "validUser"
-            // ou crie um método isInvalidPassword(newPassword)
+            // CORREÇÃO: Usando "validUser" (9 chars) para passar na validação de tamanho de username,
+            // permitindo que o admin apenas altere a senha.
             if (isInvalidUserFields("validUser", newPassword)) {
                 return createErrorResponse(422);
             }
