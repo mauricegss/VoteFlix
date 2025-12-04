@@ -21,7 +21,6 @@ public class ReviewDAO {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Inserir a Review
             pstmt = conn.prepareStatement(sql);
             pstmt.setInt(1, review.getIdFilme());
             pstmt.setInt(2, review.getIdUsuario());
@@ -39,7 +38,6 @@ public class ReviewDAO {
                 throw new SQLException("Falha ao criar review, nenhuma linha afetada.");
             }
 
-            // Recuperar ID gerado
             try (Statement stmt = conn.createStatement();
                  ResultSet generatedKeys = stmt.executeQuery("SELECT last_insert_rowid()")) {
                 if (generatedKeys.next()) {
@@ -49,8 +47,6 @@ public class ReviewDAO {
                 }
             }
 
-            // 2. Atualizar Média do Filme (Incremental: Adição)
-            // Passamos a nota nova e indicamos que é uma adição (+1 na contagem)
             updateMovieStatsIncremental(conn, review.getIdFilme(), review.getNota(), 0, "ADD");
 
             conn.commit();
@@ -65,7 +61,6 @@ public class ReviewDAO {
     }
 
     public boolean updateReview(Review review) throws SQLException {
-        // Não atualiza a data, conforme requisito
         String sqlUpdate = "UPDATE reviews SET nota = ?, titulo = ?, descricao = ?, editado = ? WHERE id = ? AND id_usuario = ?";
         String sqlSelectOld = "SELECT nota FROM reviews WHERE id = ? AND id_usuario = ?";
 
@@ -79,7 +74,6 @@ public class ReviewDAO {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Buscar a nota antiga para o cálculo incremental
             pstmtSelect = conn.prepareStatement(sqlSelectOld);
             pstmtSelect.setInt(1, review.getId());
             pstmtSelect.setInt(2, review.getIdUsuario());
@@ -90,10 +84,9 @@ public class ReviewDAO {
                 oldRating = rs.getInt("nota");
             } else {
                 conn.rollback();
-                return false; // Review não encontrada ou não pertence ao usuário
+                return false;
             }
 
-            // 2. Atualizar a Review
             pstmtUpdate = conn.prepareStatement(sqlUpdate);
             pstmtUpdate.setInt(1, review.getNota());
             pstmtUpdate.setString(2, review.getTitulo());
@@ -106,8 +99,6 @@ public class ReviewDAO {
             success = affectedRows > 0;
 
             if (success) {
-                // 3. Atualizar Média do Filme (Incremental: Edição)
-                // Se a nota mudou, recalculamos. Se for igual, não precisa mexer na média.
                 if (oldRating != review.getNota()) {
                     updateMovieStatsIncremental(conn, review.getIdFilme(), review.getNota(), oldRating, "UPDATE");
                 }
@@ -129,7 +120,6 @@ public class ReviewDAO {
     }
 
     public boolean deleteReview(int reviewId, int userId) throws SQLException {
-        // Precisamos selecionar NOTA e ID_FILME antes de deletar
         String sqlSelect = "SELECT id_filme, nota FROM reviews WHERE id = ? AND id_usuario = ?";
         String sqlDelete = "DELETE FROM reviews WHERE id = ? AND id_usuario = ?";
 
@@ -143,7 +133,6 @@ public class ReviewDAO {
         return executeDeleteTransaction(sqlSelect, sqlDelete, reviewId, 0, true);
     }
 
-    // Método auxiliar para evitar duplicação de código entre deleteReview e deleteReviewAsAdmin
     private boolean executeDeleteTransaction(String sqlSelect, String sqlDelete, int reviewId, int userId, boolean isAdmin) throws SQLException {
         Connection conn = null;
         PreparedStatement pstmtSelect = null;
@@ -157,7 +146,6 @@ public class ReviewDAO {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Buscar dados da review a ser deletada
             pstmtSelect = conn.prepareStatement(sqlSelect);
             pstmtSelect.setInt(1, reviewId);
             if (!isAdmin) {
@@ -173,7 +161,6 @@ public class ReviewDAO {
                 return false;
             }
 
-            // 2. Deletar a review
             pstmtDelete = conn.prepareStatement(sqlDelete);
             pstmtDelete.setInt(1, reviewId);
             if (!isAdmin) {
@@ -184,7 +171,6 @@ public class ReviewDAO {
             success = affectedRows > 0;
 
             if (success) {
-                // 3. Atualizar Média do Filme (Incremental: Remoção)
                 updateMovieStatsIncremental(conn, movieId, 0, oldRating, "DELETE");
                 conn.commit();
             } else {
@@ -203,11 +189,6 @@ public class ReviewDAO {
         return success;
     }
 
-    /**
-     * OTIMIZAÇÃO DE REQUISITO:
-     * Atualiza a nota do filme matematicamente sem ler todas as reviews.
-     * Operações: "ADD", "UPDATE", "DELETE"
-     */
     private void updateMovieStatsIncremental(Connection conn, int movieId, int newRatingScore, int oldRatingScore, String operation) throws SQLException {
         String selectMovieSql = "SELECT nota, qtd_avaliacoes FROM filmes WHERE id = ?";
         String updateMovieSql = "UPDATE filmes SET nota = ?, qtd_avaliacoes = ? WHERE id = ?";
@@ -234,15 +215,12 @@ public class ReviewDAO {
                             break;
                         case "UPDATE":
                             newSum = currentSum - oldRatingScore + newRatingScore;
-                            // Count não muda no update
                             break;
                     }
 
-                    // Evitar divisão por zero e números negativos (segurança)
                     if (newCount < 0) newCount = 0;
                     double newAvg = (newCount == 0) ? 0.0 : (newSum / newCount);
 
-                    // Atualizar tabela de filmes
                     try (PreparedStatement pstmtUpdate = conn.prepareStatement(updateMovieSql)) {
                         pstmtUpdate.setDouble(1, newAvg);
                         pstmtUpdate.setInt(2, newCount);
@@ -254,7 +232,30 @@ public class ReviewDAO {
         }
     }
 
-    // --- Métodos de Leitura (Sem transação) ---
+    public void updateMovieRating(Connection conn, int movieId) throws SQLException {
+        String calculateSql = "SELECT COUNT(*) as qtd, AVG(nota) as media FROM reviews WHERE id_filme = ?";
+        String updateMovieSql = "UPDATE filmes SET nota = ?, qtd_avaliacoes = ? WHERE id = ?";
+
+        double newAverage = 0.0;
+        int newCount = 0;
+
+        try (PreparedStatement pstmtCalc = conn.prepareStatement(calculateSql)) {
+            pstmtCalc.setInt(1, movieId);
+            try (ResultSet rs = pstmtCalc.executeQuery()) {
+                if (rs.next()) {
+                    newCount = rs.getInt("qtd");
+                    newAverage = rs.getDouble("media");
+                }
+            }
+        }
+
+        try (PreparedStatement pstmtUpdate = conn.prepareStatement(updateMovieSql)) {
+            pstmtUpdate.setDouble(1, newAverage);
+            pstmtUpdate.setInt(2, newCount);
+            pstmtUpdate.setInt(3, movieId);
+            pstmtUpdate.executeUpdate();
+        }
+    }
 
     public List<Review> findReviewsByMovieId(int idFilme) throws SQLException {
         List<Review> reviews = new ArrayList<>();
@@ -300,7 +301,6 @@ public class ReviewDAO {
         return null;
     }
 
-    // Helpers
     private Review mapResultSetToReview(ResultSet rs) throws SQLException {
         Review review = new Review();
         review.setId(rs.getInt("id"));
