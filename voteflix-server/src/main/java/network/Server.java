@@ -139,6 +139,33 @@ public class Server implements Runnable {
         key.cancel();
     }
 
+    // --- NOVO MÉTODO: Desconectar usuário pelo nome ---
+    public void disconnectUser(String username) {
+        ClientHandler target = null;
+
+        // 1. Encontrar o cliente na lista thread-safe
+        synchronized (activeClients) {
+            for (ClientHandler client : activeClients) {
+                if (username.equalsIgnoreCase(client.getUsername())) {
+                    target = client;
+                    break;
+                }
+            }
+        }
+
+        // 2. Se encontrado, fechar a conexão
+        if (target != null) {
+            try {
+                controller.log("Desconectando forçadamente o usuário excluído: " + username, ServerController.LogType.INFO);
+                target.getChannel().close(); // Fecha o socket
+                target.closeConnection();    // Limpa da lista e atualiza UI
+            } catch (IOException e) {
+                controller.log("Erro ao desconectar usuário forçadamente: " + e.getMessage(), ServerController.LogType.ERROR);
+            }
+        }
+    }
+    // --------------------------------------------------
+
     public void stop() {
         running = false;
         try {
@@ -151,7 +178,9 @@ public class Server implements Runnable {
             }
             synchronized (activeClients) {
                 for (ClientHandler client : activeClients) {
-                    client.getChannel().close();
+                    try {
+                        client.getChannel().close();
+                    } catch (IOException ignored) {}
                 }
                 activeClients.clear();
             }

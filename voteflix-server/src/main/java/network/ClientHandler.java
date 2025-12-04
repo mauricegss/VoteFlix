@@ -456,7 +456,7 @@ public class ClientHandler {
             JSONObject reviewJson = request.getJSONObject("review");
             Review newReview = reviewFromJson(reviewJson);
 
-            // CORREÇÃO: Adicionada validação de comprimento do Título (Min 3, Max 30)
+            // VALIDAÇÃO CORRIGIDA: Título entre 3 e 30
             if (newReview.getNota() < 1 || newReview.getNota() > 5 ||
                     newReview.getTitulo() == null || newReview.getTitulo().length() < 3 || newReview.getTitulo().length() > 30 ||
                     (newReview.getDescricao() != null && newReview.getDescricao().length() > 250)) {
@@ -515,20 +515,17 @@ public class ClientHandler {
             String descricao = reviewJson.optString("descricao", "");
 
 
-            // CORREÇÃO: Adicionada validação de comprimento do Título (Min 3, Max 30)
+            // VALIDAÇÃO CORRIGIDA: Título entre 3 e 30
             if (nota < 1 || nota > 5 || titulo.length() < 3 || titulo.length() > 30 || descricao.length() > 250) {
                 return createErrorResponse(405);
             }
 
-            // 1. Busca a review independente do usuário
             Review reviewToUpdate = reviewDAO.findById(reviewId);
 
-            // 2. Se não existir, retorna 404
             if (reviewToUpdate == null) {
                 return createErrorResponse(404);
             }
 
-            // 3. Se existir, mas não for do usuário logado, retorna 403
             if (reviewToUpdate.getIdUsuario() != userId) {
                 return createErrorResponse(403, "Você não tem permissão para editar esta avaliação.");
             }
@@ -602,8 +599,7 @@ public class ClientHandler {
             int userId = Integer.parseInt(request.getString("id"));
             String newPassword = request.getJSONObject("usuario").getString("senha");
 
-            // CORREÇÃO: Usando "validUser" (9 chars) para passar na validação de tamanho de username,
-            // permitindo que o admin apenas altere a senha.
+            // CORREÇÃO: Usando "validUser" para passar na validação de nome e permitir troca de senha
             if (isInvalidUserFields("validUser", newPassword)) {
                 return createErrorResponse(422);
             }
@@ -621,6 +617,7 @@ public class ClientHandler {
         }
     }
 
+    // --- MÉTODO COM DESCONEXÃO FORÇADA ---
     private String handleAdminDeleteUser(JSONObject request) {
         try {
             int userId = Integer.parseInt(request.getString("id"));
@@ -630,7 +627,14 @@ public class ClientHandler {
                 return createErrorResponse(403);
             }
 
+            // Guardar nome para desconectar depois
+            String deletedUsername = (userToDelete != null) ? userToDelete.getNome() : null;
+
             if (userDAO.deleteUserById(userId)) {
+                // CORREÇÃO: Desconectar o utilizador se ele estiver online
+                if (deletedUsername != null) {
+                    server.disconnectUser(deletedUsername);
+                }
                 return createSuccessResponse("200").toString();
             } else {
                 return createErrorResponse(404);
@@ -642,6 +646,7 @@ public class ClientHandler {
             return createErrorResponse(400);
         }
     }
+    // -------------------------------------
 
     private String handleLogout() {
         this.needsToClose = true;
